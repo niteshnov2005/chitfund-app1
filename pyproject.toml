@@ -3,13 +3,14 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "chitfund-main-app"
+name = "chitfund-main-app" # This is fine as the parent name
 version = "0.1.0"
-requires-python = ">=3.12"
+
 dependencies = [
     "flask==3.1.2",
     "pymongo==4.5.0",
-    "chitfund-app1 @ git+https://github.com/niteshnov2005/chitfund-app1.git@main"
+    # Change the name here to match what uv found in the metadata
+    "chitfund-main-app @ git+https://github.com/niteshnov2005/chitfund-app1.git@main"
 ]
 
 
