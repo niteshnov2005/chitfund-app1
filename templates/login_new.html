@@ -3,91 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chit Fund - Login</title>
+    <title>ChitFund - Login</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0a0a1f 0%, #1a1a2e 50%, #2d1b4e 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            color: #fff;
         }
 
         .login-container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
-            display: flex;
-            max-width: 900px;
-            width: 100%;
+            background: rgba(26, 26, 46, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(168, 85, 247, 0.2);
+            border-radius: 24px;
+            padding: 50px;
+            width: 450px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
         }
 
-        .login-left {
-            flex: 1;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 60px 40px;
-            color: white;
+        .logo {
             display: flex;
-            flex-direction: column;
-            justify-content: center;
             align-items: center;
-            text-align: center;
-        }
-
-        .login-left h1 {
-            font-size: 2.5rem;
-            margin-bottom: 20px;
-        }
-
-        .login-left p {
-            font-size: 1.1rem;
-            opacity: 0.9;
-            line-height: 1.6;
-        }
-
-        .login-left .icon {
-            font-size: 5rem;
-            margin-bottom: 30px;
-            opacity: 0.9;
-        }
-
-        .login-right {
-            flex: 1;
-            padding: 60px 40px;
-        }
-
-        .login-form h2 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 2rem;
-        }
-
-        .login-form p {
-            color: #666;
+            justify-content: center;
+            gap: 12px;
             margin-bottom: 40px;
         }
 
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #a855f7, #d946ef);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .logo-text {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #9ca3af;
+            margin-bottom: 35px;
+            font-size: 14px;
+        }
+
+        .user-type-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            background: rgba(15, 15, 35, 0.6);
+            padding: 6px;
+            border-radius: 12px;
+        }
+
+        .user-type-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: transparent;
+            color: #9ca3af;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .user-type-btn.active {
+            background: linear-gradient(135deg, #a855f7, #d946ef);
+            color: white;
+        }
+
         .form-group {
-            margin-bottom: 25px;
-            position: relative;
+            margin-bottom: 20px;
         }
 
         .form-group label {
             display: block;
             margin-bottom: 8px;
-            color: #555;
+            color: #d1d5db;
+            font-size: 14px;
             font-weight: 500;
-            font-size: 0.9rem;
         }
 
         .input-wrapper {
@@ -96,47 +109,50 @@
 
         .input-wrapper i {
             position: absolute;
-            left: 15px;
+            left: 16px;
             top: 50%;
             transform: translateY(-50%);
-            color: #999;
+            color: #6b7280;
         }
 
         .form-group input {
             width: 100%;
-            padding: 12px 15px 12px 45px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 1rem;
+            padding: 14px 16px 14px 45px;
+            background: rgba(15, 15, 35, 0.6);
+            border: 1px solid rgba(168, 85, 247, 0.2);
+            border-radius: 12px;
+            color: white;
+            font-size: 15px;
             transition: all 0.3s;
         }
 
         .form-group input:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: #a855f7;
+            background: rgba(15, 15, 35, 0.8);
+        }
+
+        .form-group input::placeholder {
+            color: #6b7280;
         }
 
         .btn-login {
             width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 16px;
+            background: linear-gradient(135deg, #a855f7, #d946ef);
             color: white;
             border: none;
-            border-radius: 10px;
-            font-size: 1.1rem;
+            border-radius: 12px;
+            font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.3s;
+            margin-top: 10px;
         }
 
         .btn-login:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-
-        .btn-login:active {
-            transform: translateY(0);
+            box-shadow: 0 10px 30px rgba(168, 85, 247, 0.4);
         }
 
         .btn-login:disabled {
@@ -145,24 +161,30 @@
         }
 
         .error-message {
-            background: #fee;
-            color: #c33;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
             padding: 12px;
             border-radius: 8px;
             margin-bottom: 20px;
             display: none;
-            font-size: 0.9rem;
+            font-size: 14px;
         }
 
-        .error-message.show {
-            display: block;
+        .error-message.show { display: block; }
+
+        .default-creds {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
         }
 
         .loading {
             display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,.3);
             border-radius: 50%;
             border-top-color: white;
             animation: spin 0.8s linear infinite;
@@ -171,105 +193,55 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
-
-        .user-type-toggle {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 30px;
-        }
-
-        .user-type-btn {
-            flex: 1;
-            padding: 10px;
-            border: 2px solid #e0e0e0;
-            background: white;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: 500;
-        }
-
-        .user-type-btn.active {
-            border-color: #667eea;
-            background: #667eea;
-            color: white;
-        }
-
-        @media (max-width: 768px) {
-            .login-container {
-                flex-direction: column;
-            }
-
-            .login-left {
-                padding: 40px 20px;
-            }
-
-            .login-right {
-                padding: 40px 20px;
-            }
-
-            .login-left h1 {
-                font-size: 2rem;
-            }
-
-            .login-left .icon {
-                font-size: 3rem;
-            }
-        }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <div class="login-left">
-            <div class="icon">
+        <div class="logo">
+            <div class="logo-icon">
                 <i class="fas fa-coins"></i>
             </div>
-            <h1>Chit Fund Management</h1>
-            <p>Secure and efficient management of your chit fund operations. Track payments, manage auctions, and generate reports with ease.</p>
+            <div class="logo-text">ChitFund</div>
         </div>
-        
-        <div class="login-right">
-            <div class="login-form">
-                <h2>Welcome Back</h2>
-                <p>Please login to your account</p>
 
-                <div class="user-type-toggle">
-                    <button class="user-type-btn active" onclick="setUserType('admin')" id="btn-admin">
-                        <i class="fas fa-user-shield"></i> Admin
-                    </button>
-                    <button class="user-type-btn" onclick="setUserType('member')" id="btn-member">
-                        <i class="fas fa-user"></i> Member
-                    </button>
-                </div>
+        <h2>Welcome Back</h2>
+        <p class="subtitle">Please login to your account</p>
 
-                <div class="error-message" id="error-message"></div>
+        <div class="user-type-toggle">
+            <button class="user-type-btn active" onclick="setUserType('admin')" id="btn-admin">
+                <i class="fas fa-user-shield"></i> Admin
+            </button>
+            <button class="user-type-btn" onclick="setUserType('member')" id="btn-member">
+                <i class="fas fa-user"></i> Member
+            </button>
+        </div>
 
-                <form id="login-form" onsubmit="handleLogin(event)">
-                    <div class="form-group">
-                        <label for="username">Username</label>
-                        <div class="input-wrapper">
-                            <i class="fas fa-user"></i>
-                            <input type="text" id="username" name="username" required placeholder="Enter your username">
-                        </div>
-                    </div>
+        <div class="error-message" id="error-message"></div>
 
-                    <div class="form-group">
-                        <label for="password">Password</label>
-                        <div class="input-wrapper">
-                            <i class="fas fa-lock"></i>
-                            <input type="password" id="password" name="password" required placeholder="Enter your password">
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn-login" id="btn-submit">
-                        <span id="btn-text">Login</span>
-                    </button>
-                </form>
-
-                <div style="margin-top: 20px; text-align: center; color: #999; font-size: 0.85rem;">
-                    <p>Default Admin: admin / nitesh2025</p>
+        <form id="login-form" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-user"></i>
+                    <input type="text" id="username" name="username" required placeholder="Enter your username">
                 </div>
             </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                </div>
+            </div>
+
+            <button type="submit" class="btn-login" id="btn-submit">
+                <span id="btn-text">Login</span>
+            </button>
+        </form>
+
+        <div class="default-creds">
+            <p>Default Admin: admin / nitesh2025</p>
         </div>
     </div>
 
@@ -284,26 +256,20 @@
 
         async function handleLogin(event) {
             event.preventDefault();
-            
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const errorMsg = document.getElementById('error-message');
             const btnSubmit = document.getElementById('btn-submit');
             const btnText = document.getElementById('btn-text');
             
-            // Clear previous errors
             errorMsg.classList.remove('show');
-            
-            // Show loading
             btnSubmit.disabled = true;
             btnText.innerHTML = '<span class="loading"></span>';
             
             try {
                 const response = await fetch('/api/login', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
                 
