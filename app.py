@@ -37,6 +37,11 @@ def get_current_user():
     return None
 
 # --- AUTHENTICATION ROUTES ---
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Kubernetes/preview"""
+    return jsonify({'status': 'healthy', 'service': 'chitfund'}), 200
+
 @app.route('/')
 def index():
     if 'user_id' in session:
