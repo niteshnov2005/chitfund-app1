@@ -3,6 +3,17 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "emergentintegrations"
+name = "chitfund-app1"
 version = "0.1.0"
-dependencies = [] # Add any dependencies THIS sub-repo needs here
+requires-python = ">=3.12"
+dependencies = [
+    "flask==3.1.2",
+    "pymongo==4.5.0",
+    "bcrypt==4.1.3",
+    "pandas==2.3.3",
+    "python-dotenv==1.2.1",
+    "emergentintegrations @ git+https://github.com/niteshnov2005/chitfund-app1.git@main"
+]
+
+[tool.setuptools.packages.find]
+include = ["backend*"]  # This tells Python only to look at the 'backend' folder
