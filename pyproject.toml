@@ -3,14 +3,15 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "chitfund-main-app" # This is fine as the parent name
+name = "chitfund-web-service"  # Unique name for the Vercel app
 version = "0.1.0"
+requires-python = ">=3.12"      # Clears the 'requires-python' warning
 
 dependencies = [
     "flask==3.1.2",
     "pymongo==4.5.0",
-    # Change the name here to match what uv found in the metadata
-    "chitfund-main-app @ git+https://github.com/niteshnov2005/chitfund-app1.git@main"
+    # This name MUST match whatever is inside the GitHub repo's pyproject.toml
+    "chitfund-app1 @ git+https://github.com/niteshnov2005/chitfund-app1.git@main"
 ]
 
 
