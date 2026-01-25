@@ -15,5 +15,6 @@ dependencies = [
     "emergentintegrations @ git+https://github.com/niteshnov2005/chitfund-app1.git@main"
 ]
 
+
 [tool.setuptools.packages.find]
 include = ["backend*"]  # This tells Python only to look at the 'backend' folder
