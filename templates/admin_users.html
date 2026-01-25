@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Accounts - Chit Fund</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary: #667eea; --sidebar-width: 260px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f7fafc; }
+        .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: var(--sidebar-width);
+            background: linear-gradient(180deg, #667eea, #764ba2); color: white; z-index: 1000; }
+        .sidebar-header { padding: 30px 20px; }
+        .sidebar-header h2 { font-size: 1.5rem; }
+        .sidebar-menu { padding: 20px 0; }
+        .menu-item { display: flex; align-items: center; padding: 15px 25px; color: white;
+            text-decoration: none; transition: all 0.3s; border-left: 4px solid transparent; }
+        .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.1); border-left-color: white; }
+        .menu-item i { width: 30px; font-size: 1.2rem; }
+        .main-content { margin-left: var(--sidebar-width); min-height: 100vh; }
+        .topbar { background: white; padding: 20px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex; justify-content: space-between; }
+        .topbar h1 { font-size: 1.8rem; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; }
+        .btn-danger { background: #f56565; color: white; text-decoration: none; }
+        .content { padding: 30px; }
+        .user-card { background: white; padding: 25px; border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .user-card h2 { margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header"><h2><i class="fas fa-coins"></i> Chit Fund</h2></div>
+        <nav class="sidebar-menu">
+            <a href="/admin/dashboard" class="menu-item"><i class="fas fa-home"></i><span>Dashboard</span></a>
+            <a href="/admin/members" class="menu-item"><i class="fas fa-users"></i><span>Members</span></a>
+            <a href="/admin/auctions" class="menu-item"><i class="fas fa-gavel"></i><span>Auctions</span></a>
+            <a href="/admin/reports" class="menu-item"><i class="fas fa-chart-line"></i><span>Reports</span></a>
+            <a href="/admin/users" class="menu-item active"><i class="fas fa-user-cog"></i><span>User Accounts</span></a>
+        </nav>
+    </aside>
+
+    <div class="main-content">
+        <div class="topbar">
+            <h1>User Accounts Management</h1>
+            <a href="/logout" class="btn btn-danger">Logout</a>
+        </div>
+
+        <div class="content">
+            <div class="user-card">
+                <h2>Manage User Accounts</h2>
+                <p>Create and manage member login accounts from the Members page.</p>
+                <p style="margin-top: 10px; color: #666;">Navigate to Members > Add Member > Enable "Create user account"</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
