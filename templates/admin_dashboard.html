@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Chit Fund</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --success: #48bb78;
+            --danger: #f56565;
+            --warning: #ed8936;
+            --info: #4299e1;
+            --dark: #2d3748;
+            --light: #f7fafc;
+            --sidebar-width: 260px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--light);
+            color: var(--dark);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: var(--sidebar-width);
+            background: linear-gradient(180deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            overflow-y: auto;
+            transition: transform 0.3s;
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 30px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+
+        .sidebar-header p {
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+
+        .sidebar-menu {
+            padding: 20px 0;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 25px;
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s;
+            border-left: 4px solid transparent;
+        }
+
+        .menu-item:hover {
+            background: rgba(255,255,255,0.1);
+            border-left-color: white;
+        }
+
+        .menu-item.active {
+            background: rgba(255,255,255,0.15);
+            border-left-color: white;
+        }
+
+        .menu-item i {
+            width: 30px;
+            font-size: 1.2rem;
+        }
+
+        .menu-item span {
+            font-size: 1rem;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+        }
+
+        .topbar {
+            background: white;
+            padding: 20px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .topbar-left h1 {
+            font-size: 1.8rem;
+            color: var(--dark);
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .btn-logout {
+            padding: 8px 20px;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .btn-logout:hover {
+            background: #e53e3e;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            transition: transform 0.3s, box-shadow 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+
+        .stat-icon.blue { background: linear-gradient(135deg, #4299e1, #3182ce); }
+        .stat-icon.green { background: linear-gradient(135deg, #48bb78, #38a169); }
+        .stat-icon.red { background: linear-gradient(135deg, #f56565, #e53e3e); }
+        .stat-icon.purple { background: linear-gradient(135deg, #9f7aea, #805ad5); }
+
+        .stat-details h3 {
+            font-size: 0.85rem;
+            color: #718096;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--dark);
+        }
+
+        .stat-change {
+            font-size: 0.85rem;
+            color: var(--success);
+            margin-top: 5px;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+        }
+
+        .quick-actions h2 {
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .action-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 25px;
+            background: var(--light);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            text-decoration: none;
+            color: var(--dark);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .action-btn:hover {
+            border-color: var(--primary);
+            background: white;
+            transform: translateY(-3px);
+        }
+
+        .action-btn i {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: var(--primary);
+        }
+
+        .action-btn span {
+            font-weight: 500;
+        }
+
+        /* Recent Activity */
+        .recent-activity {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .recent-activity h2 {
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+
+        .activity-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #e2e8f0;
+            transition: background 0.3s;
+        }
+
+        .activity-item:hover {
+            background: var(--light);
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: var(--success);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+        }
+
+        .activity-details {
+            flex: 1;
+        }
+
+        .activity-details h4 {
+            font-size: 0.95rem;
+            margin-bottom: 3px;
+        }
+
+        .activity-details p {
+            font-size: 0.85rem;
+            color: #718096;
+        }
+
+        .activity-amount {
+            font-weight: bold;
+            color: var(--success);
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 999;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .topbar {
+                padding: 15px 20px;
+            }
+
+            .topbar-left h1 {
+                font-size: 1.3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2><i class="fas fa-coins"></i> Chit Fund</h2>
+            <p>Admin Panel</p>
+        </div>
+        <nav class="sidebar-menu">
+            <a href="/admin/dashboard" class="menu-item active" data-testid="nav-dashboard">
+                <i class="fas fa-home"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="/admin/members" class="menu-item" data-testid="nav-members">
+                <i class="fas fa-users"></i>
+                <span>Members</span>
+            </a>
+            <a href="/admin/auctions" class="menu-item" data-testid="nav-auctions">
+                <i class="fas fa-gavel"></i>
+                <span>Auctions</span>
+            </a>
+            <a href="/admin/reports" class="menu-item" data-testid="nav-reports">
+                <i class="fas fa-chart-line"></i>
+                <span>Reports</span>
+            </a>
+            <a href="/admin/users" class="menu-item" data-testid="nav-users">
+                <i class="fas fa-user-cog"></i>
+                <span>User Accounts</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Topbar -->
+        <div class="topbar">
+            <div class="topbar-left">
+                <h1 data-testid="dashboard-title">Dashboard</h1>
+            </div>
+            <div class="topbar-right">
+                <div class="user-info">
+                    <div class="user-avatar">A</div>
+                    <span>Admin</span>
+                </div>
+                <a href="/logout" class="btn-logout" data-testid="logout-button">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card" data-testid="total-members-card">
+                    <div class="stat-header">
+                        <div class="stat-details">
+                            <h3>Total Members</h3>
+                            <div class="stat-value" id="total-members">0</div>
+                        </div>
+                        <div class="stat-icon blue">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card" data-testid="total-value-card">
+                    <div class="stat-header">
+                        <div class="stat-details">
+                            <h3>Total Value</h3>
+                            <div class="stat-value" id="total-value">₹0</div>
+                        </div>
+                        <div class="stat-icon green">
+                            <i class="fas fa-rupee-sign"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card" data-testid="pending-amount-card">
+                    <div class="stat-header">
+                        <div class="stat-details">
+                            <h3>Pending Amount</h3>
+                            <div class="stat-value" id="pending-value">₹0</div>
+                        </div>
+                        <div class="stat-icon red">
+                            <i class="fas fa-exclamation-circle"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card" data-testid="pending-members-card">
+                    <div class="stat-header">
+                        <div class="stat-details">
+                            <h3>Pending Members</h3>
+                            <div class="stat-value" id="pending-members">0</div>
+                        </div>
+                        <div class="stat-icon purple">
+                            <i class="fas fa-user-clock"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <h2>Quick Actions</h2>
+                <div class="actions-grid">
+                    <a href="/admin/members" class="action-btn" data-testid="action-manage-members">
+                        <i class="fas fa-users"></i>
+                        <span>Manage Members</span>
+                    </a>
+                    <a href="/admin/auctions" class="action-btn" data-testid="action-run-auction">
+                        <i class="fas fa-gavel"></i>
+                        <span>Run Auction</span>
+                    </a>
+                    <a href="/admin/reports" class="action-btn" data-testid="action-view-reports">
+                        <i class="fas fa-file-alt"></i>
+                        <span>View Reports</span>
+                    </a>
+                    <a href="/admin/users" class="action-btn" data-testid="action-manage-users">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Add Users</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="recent-activity">
+                <h2>Recent Payments</h2>
+                <div id="recent-payments">
+                    <div style="text-align: center; padding: 20px; color: #999;">
+                        Loading...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Menu Button -->
+    <button class="mobile-menu-btn" onclick="toggleSidebar()" data-testid="mobile-menu-toggle">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/admin/stats');
+                const data = await response.json();
+
+                document.getElementById('total-members').textContent = data.total_members || 0;
+                document.getElementById('total-value').textContent = '₹' + (data.total_value || 0).toLocaleString();
+                document.getElementById('pending-value').textContent = '₹' + (data.pending_value || 0).toLocaleString();
+                document.getElementById('pending-members').textContent = data.pending_members || 0;
+
+                // Load recent payments
+                const paymentsHtml = data.recent_payments && data.recent_payments.length > 0
+                    ? data.recent_payments.map(p => `
+                        <div class="activity-item">
+                            <div class="activity-icon">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <div class="activity-details">
+                                <h4>${p.name}</h4>
+                                <p>${p.date}</p>
+                            </div>
+                            <div class="activity-amount">₹${p.amount.toLocaleString()}</div>
+                        </div>
+                    `).join('')
+                    : '<div style="text-align: center; padding: 20px; color: #999;">No recent payments</div>';
+
+                document.getElementById('recent-payments').innerHTML = paymentsHtml;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load stats on page load
+        loadStats();
+
+        // Refresh stats every 30 seconds
+        setInterval(loadStats, 30000);
+    </script>
+</body>
+</html>
