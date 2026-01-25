@@ -9,7 +9,9 @@ import json
 import io
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'mini_project_secret_key_secure_2025')
+app.secret_key = os.getenv('SECRET_KEY')
+if not app.secret_key:
+    raise ValueError("SECRET_KEY environment variable is required")
 
 # Initialize database
 init_db()
