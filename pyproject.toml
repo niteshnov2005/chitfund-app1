@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "chitfund-web-interface"  # Change this from chitfund-app1
+name = "chitfund-web-service"  # Unique name for the Vercel app
 version = "0.1.0"
 requires-python = ">=3.12"
 
