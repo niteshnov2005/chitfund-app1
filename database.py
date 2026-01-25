@@ -32,7 +32,8 @@ def init_db():
     # Create default admin user if not exists
     import bcrypt
     if users_collection.count_documents({'role': 'admin'}) == 0:
-        hashed_pw = bcrypt.hashpw('nitesh2025'.encode('utf-8'), bcrypt.gensalt())
+        default_password = os.getenv('DEFAULT_ADMIN_PASSWORD', 'changeme')
+        hashed_pw = bcrypt.hashpw(default_password.encode('utf-8'), bcrypt.gensalt())
         users_collection.insert_one({
             'username': 'admin',
             'password': hashed_pw,
