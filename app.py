@@ -1,849 +1,410 @@
-from flask import Flask, render_template, jsonify, request, redirect, url_for, session
-from datetime import datetime
-import pandas as pd
-import openpyxl
-import os
-import time
-import traceback
-import json
-
-import io
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session, send_file
+from datetime import datetime, timedelta
+from bson import ObjectId
+import bcrypt
+import os
+from database import db, users_collection, members_collection, payments_collection, auctions_collection, sheets_collection, init_db
+import pandas as pd
+import json
+import io
 
 app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', 'mini_project_secret_key_secure_2025')
 
-app.secret_key = 'mini_project_secret_key'
-app.secret_key = 'mini_project_secret_key'
+# Initialize database
+init_db()
 
-# --- CONFIGURATION (Start) ---
-# Detect environment
-IS_CLOUD_RUN = os.environ.get('K_SERVICE') is not None
-HAS_SUPABASE = os.environ.get("SUPABASE_URL") is not None
+# --- HELPER FUNCTIONS ---
+def login_required(role=None):
+    """Decorator to check if user is logged in"""
+    def decorator(f):
+        def wrapper(*args, **kwargs):
+            if 'user_id' not in session:
+                return redirect(url_for('login_page'))
+            if role and session.get('role') != role:
+                return jsonify({'error': 'Unauthorized'}), 403
+            return f(*args, **kwargs)
+        wrapper.__name__ = f.__name__
+        return wrapper
+    return decorator
 
-if IS_CLOUD_RUN:
-    # Cloud Run (Stateless): Must use /tmp
-    FILE_NAME = '/tmp/data.xlsx'
-else:
-    # Local Windows or PythonAnywhere (Stateful): Use local file
-    # Ensure absolute path for PythonAnywhere robustness
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    FILE_NAME = os.path.join(BASE_DIR, 'sample_gemini.xlsx')
+def get_current_user():
+    """Get current logged in user"""
+    if 'user_id' in session:
+        return users_collection.find_one({'_id': ObjectId(session['user_id'])})
+    return None
 
-USE_CLOUD_STORAGE = HAS_SUPABASE
-BUCKET_NAME = os.environ.get("BUCKET_NAME", "chitfund-data")
-
-# --- CLOUD STORAGE HELPERS (SUPABASE) ---
-def sync_down():
-    """Downloads the excel file from Supabase Storage if it exists."""
-    if not USE_CLOUD_STORAGE: return
-    try:
-        from supabase import create_client
-        url = os.environ.get("SUPABASE_URL")
-        key = os.environ.get("SUPABASE_KEY")
-        if not url or not key:
-            print("Supabase credentials missing.")
-            return
-
-        supabase = create_client(url, key)
-        
-        # Download file (returns bytes)
-        print(f"Downloading data.xlsx from bucket '{BUCKET_NAME}'...")
-        response = supabase.storage.from_(BUCKET_NAME).download('data.xlsx')
-        
-        if response:
-            with open(FILE_NAME, 'wb') as f:
-                f.write(response)
-            print("Download successful.")
-        else:
-            print("No remote file found.")
-            # If Cloud Run and no remote file, we might crash if we don't have a seed.
-            # But currently we assume seed is in bucket.
-            
-    except Exception as e:
-        print(f"Supabase Download Error: {e}")
-
-# Initial Sync
-if USE_CLOUD_STORAGE: sync_down()
-
-# Cloud Run Fallback: If /tmp/data.xlsx still doesn't exist (sync failed or new setup),
-# try to copy from local seed if available in container
-if IS_CLOUD_RUN and not os.path.exists(FILE_NAME):
-    local_seed = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sample_gemini.xlsx')
-    if os.path.exists(local_seed):
-        print("Copying local seed to /tmp...")
-        import shutil
-        shutil.copy(local_seed, FILE_NAME)
-
-def sync_up():
-    """Uploads the local excel file to Supabase Storage."""
-    if not USE_CLOUD_STORAGE: return
-    try:
-        from supabase import create_client
-        url = os.environ.get("SUPABASE_URL")
-        key = os.environ.get("SUPABASE_KEY")
-        if not url or not key: return
-
-        supabase = create_client(url, key)
-        
-        print(f"Uploading data.xlsx to bucket '{BUCKET_NAME}'...")
-        with open(FILE_NAME, 'rb') as f:
-            # Upsert is handled via file_options in some versions, or explicit 'upload' with overwriting behavior
-            # supabase-py storage upload signature varies. safer to try upload, if fail try update (or use upsert option)
-            # Standard py client usually supports file_options={"upsert": "true"}
-            supabase.storage.from_(BUCKET_NAME).upload('data.xlsx', f, file_options={"upsert": "true"})
-            
-        print("Upload successful.")
-    except Exception as e:
-        # Fallback: if upload fails (maybe file exists and upsert didn't work), try 'update'
-        try:
-           print(f"Upload failed ({e}), trying update...")
-           with open(FILE_NAME, 'rb') as f:
-               supabase.storage.from_(BUCKET_NAME).update('data.xlsx', f, file_options={"upsert": "true"})
-           print("Update successful.")
-        except Exception as e2:
-           print(f"Supabase Upload/Update Error: {e2}")
-
-# Initial Sync
-if USE_CLOUD_STORAGE: sync_down()
-
-# --- UTILS ---
-def clean_num(val):
-    try:
-        return float(str(val).replace(',', '').replace('₹', '').strip())
-    except:
-        return 0.0
-
-def clean_plan_amount(plan_str):
-    try:
-        cleaned = str(plan_str).replace(',', '').replace('₹', '').split('.')[0]
-        return int(cleaned)
-    except: return 0
-
-def normalize_text(text):
-    if not text: return ""
-    return str(text).lower().replace('.', '').replace(' ', '').replace(':', '').strip()
-
-# --- PAYMENT RECORDS DB HANDLER ---
-PAID_DB_FILE = 'payment_records.json'
-
-def load_paid_db():
-    if not os.path.exists(PAID_DB_FILE): return {}
-    try:
-        with open(PAID_DB_FILE, 'r') as f: return json.load(f)
-    except: return {}
-
-def save_paid_db(data):
-    with open(PAID_DB_FILE, 'w') as f: json.dump(data, f, indent=4)
-
-# --- HELPER: GET ALL SHEET NAMES (MONTHS) ---
-def get_all_sheet_names():
-    if not os.path.exists(FILE_NAME): return []
-    try:
-        wb = openpyxl.load_workbook(FILE_NAME, read_only=True)
-        names = wb.sheetnames
-        wb.close()
-        return names
-    except: return []
-
-# --- 1. DASHBOARD READER (Supports specific sheet_name) ---
-# --- 1. DASHBOARD READER (Supports specific sheet_name) ---
-def get_excel_data(sheet_name=None):
-    if not os.path.exists(FILE_NAME): return []
-    try:
-        # DEBUG: Print sheet names to verify order
-        wb_temp = openpyxl.load_workbook(FILE_NAME, read_only=True)
-        all_sheets = wb_temp.sheetnames
-        print(f"DEBUG: All Sheets: {all_sheets}")
-        wb_temp.close()
-
-        # If no sheet specified, default to the FIRST sheet (Index 0)
-        # because run_auction_batch moves the NEW sheet to the Front.
-        if not sheet_name:
-            if all_sheets:
-                sheet_name = all_sheets[0] 
-            else:
-                return []
-            
-        print(f"DEBUG: Reading sheet '{sheet_name}'")
-        df = pd.read_excel(FILE_NAME, sheet_name=sheet_name, header=None, engine='openpyxl')
-    except Exception as e:
-        print(f"ERROR in get_excel_data: {e}")
-        traceback.print_exc()
-        return []
-
-    paid_db = load_paid_db()
-    members_list = []
-
-    # --- STEP 1: BUILD MASTER LIST ---
-    member_map = {}
-    name_only_map = {}
-
-    # --- STEP 1: SCAN LEDGER BLOCKS (Authoritative Member Data) ---
-    # Ledger columns are typically:
-    # A (0): Month/Label, B (1): Plan/Name, C (2): Commission, D (3): Amount
-    # F (5): Month/Label, G (6): Plan/Name, H (7): Commission, I (8): Amount
-    
-    ledger_configs = [
-        {'label_col': 0, 'data_col': 1, 'comm_col': 2, 'amt_col': 3},
-        {'label_col': 5, 'data_col': 6, 'comm_col': 7, 'amt_col': 8}
-    ]
-
-    for config in ledger_configs:
-        curr_member = None
-        curr_area = "General"
-        
-        for r in range(df.shape[0]):
-            try:
-                cell_label = str(df.iloc[r, config['label_col']]).strip().upper()
-                
-                # Detect Member Header
-                if cell_label == 'NAME':
-                    raw_name = str(df.iloc[r, config['data_col']]).strip().title()
-                    if not raw_name or raw_name.upper() in ['NAN', 'NONE', '']:
-                        curr_member = None
-                        continue
-                        
-                    raw_area = str(df.iloc[r, config['comm_col']]).strip().title()
-                    if not raw_area or raw_area.upper() in ['NAN', 'NONE', '']:
-                        raw_area = "General"
-                    
-                    norm_n = normalize_text(raw_name)
-                    norm_a = normalize_text(raw_area)
-                    unique_key = f"{norm_n}_{norm_a}"
-                    
-                    if unique_key not in member_map:
-                        curr_member = {
-                            'name': raw_name,
-                            'area': raw_area,
-                            'total': 0,
-                            'items': [],
-                            'payment_id': f"{raw_name}_0".replace(" ", ""), # Temporary
-                            'is_paid': False,
-                            'paid_date': None
-                        }
-                        members_list.append(curr_member)
-                        member_map[unique_key] = curr_member
-                        name_only_map.setdefault(norm_n, []).append(curr_member)
-                    else:
-                        curr_member = member_map[unique_key]
-
-                # Detect Individual Plan Rows (Numeric Month)
-                elif curr_member and cell_label.replace('.','',1).isdigit():
-                    month_label = str(df.iloc[r, config['label_col']]).strip()
-                    plan_val = str(df.iloc[r, config['data_col']]).strip()
-                    comm_val = str(df.iloc[r, config['comm_col']]).strip()
-                    amt = clean_num(df.iloc[r, config['amt_col']])
-                    
-                    if amt > 0:
-                        # Generate Item ID
-                        item_id = f"{normalize_text(curr_member['name'])}_{int(amt)}_{month_label}_{plan_val}".replace(" ", "").replace(".","")
-                        
-                        # Check payment status
-                        db_entry = paid_db.get(item_id)
-                        item_is_paid = False
-                        item_paid_date = None
-                        if db_entry:
-                            item_is_paid = True
-                            if isinstance(db_entry, str): item_paid_date = db_entry
-
-                        curr_member['items'].append({
-                            'month': month_label,
-                            'plan': plan_val,
-                            'commission': comm_val,
-                            'amount': amt,
-                            'id': item_id,
-                            'is_paid': item_is_paid,
-                            'paid_date': item_paid_date
-                        })
-                        
-                        # Update Member-level payment_id (legacy support)
-                        curr_member['payment_id'] = f"{curr_member['name']}_{int(sum(i['amount'] for i in curr_member['items']))}".replace(" ", "")
-
-                # Reset member at block end
-                elif 'TOTAL' in cell_label:
-                    curr_member = None
-
-            except Exception as e:
-                pass
-
-    # --- STEP 2: SCAN FOR COMMISSIONS (Columns B and G specifically for 'Comm.') ---
-    # Many users have 'Comm.' rows in their plans. Our Ledger scan above handles them if they have numeric months.
-    # If they are listed separately, we'll find them here.
-    # Actually, the ledger scan is comprehensive enough. We'll add a specific check for Row-based Grand Totals.
-
-    # --- STEP 4: RE-CALCULATE MEMBER TOTALS with Partial Logic ---
-    final_list = []
-    
-    for m in members_list:
-        if m['items']:
-            # Calculate total from items to be safe
-            m['total'] = sum(i['amount'] for i in m['items'])
-            m['paid_amount'] = sum(i['amount'] for i in m['items'] if i['is_paid'])
-            m['is_paid'] = (m['paid_amount'] >= m['total']) and (m['total'] > 0)
-        else:
-            # Fallback for members without items
-            m['paid_amount'] = m['total'] if m['is_paid'] else 0
-            
-        final_list.append(m)
-
-    # --- STEP 5: GET EXPLICIT GRAND TOTAL ---
-    # The excel has a trusted Grand Total at Row 23, Col 15 (Index 22, 14 0-indexed)
-    import math
-    grand_total_val = 0
-    try:
-        # Check specific cell
-        raw_gt = df.iloc[22, 14]
-        grand_total_val = clean_num(raw_gt)
-        if math.isnan(grand_total_val): grand_total_val = 0
-        
-        print(f"DEBUG: Grand Total from Excel cell [22,14]: {grand_total_val}")
-        # Validate order of magnitude (should be > 100k)
-        if grand_total_val < 100000:
-             # Fallback scan: maybe its somewhere else or sheet is smaller
-             print("DEBUG: Grand Total cell too small, scanning column 14 for 'Grand Total' text...")
-             for r in range(df.shape[0]):
-                 try:
-                     label = str(df.iloc[r, 13]).upper()
-                     if 'GRAND TOTAL' in label or 'TOTAL' in label:
-                         val = clean_num(df.iloc[r, 14])
-                         if not math.isnan(val) and val > 100000: 
-                             grand_total_val = val
-                             break
-                 except: pass
-    except Exception as e: 
-        print(f"DEBUG Error in Grand Total extraction: {e}")
-        pass
-    
-    if math.isnan(grand_total_val): grand_total_val = 0
-    # Calculate a sum of all found members for consistency
-    calculated_total = sum(m['total'] for m in final_list)
-    
-    print(f"DEBUG: Returning {len(final_list)} members. Grand Total (Excel): {grand_total_val}, Calculated Total: {calculated_total}")
-    
-    # Return structure with metadata
-    return {
-        'members': sorted(final_list, key=lambda x: x['name']),
-        'grand_total': grand_total_val,
-        'calculated_total': calculated_total
-    }
-
-# --- 2. AUCTION READER ---
-def get_auction_plans():
-    if not os.path.exists(FILE_NAME): return []
-    try: df = pd.read_excel(FILE_NAME, header=None, engine='openpyxl')
-    except: return []
-    plans = []
-    for r in range(2, 50):
-        try:
-            m_val = str(df.iloc[r, 11]).strip()
-            p_val_raw = str(df.iloc[r, 12]).strip()
-            if not m_val or m_val.upper() == 'NAN': continue
-            if 'TOTAL' in str(df.iloc[r, 13]).upper(): break
-            p_val = clean_plan_amount(p_val_raw)
-            if p_val > 0:
-                plans.append({'current_month': m_val, 'plan_display': p_val_raw, 'plan_value': p_val, 'id': f"{m_val}_{p_val}", 'member_count': "-"})
-        except: pass
-    return plans
-
-# --- 3. AUCTION UPDATER (FIXED: Month Format + Zero Commission Total) ---
-@app.route('/run-auction-batch', methods=['POST'])
-def run_auction_batch():
-    if 'user' not in session: return redirect(url_for('login_page'))
-    try:
-        global_date = request.form.get('global_date')
-        sheet_name_suffix = request.form.get('sheet_name')
-
-        updates = {}
-        # 1. Parse Inputs
-        for key, val in request.form.items():
-            if key.startswith('bid_for_'):
-                unique_id = key.replace('bid_for_', '')
-                new_m = request.form.get(f'new_month_for_{unique_id}')
-                bid = request.form.get(f'bid_for_{unique_id}')
-
-                # Check if new_m and bid exist (strings "0" are True, empty strings are False)
-                if new_m and bid is not None:
-                    try:
-                        total_bid = float(bid)
-                        plan_val = int(unique_id.split('_')[1])
-                        dividend = total_bid / 20
-                        payable_amount = (plan_val - total_bid) / 20
-
-                        updates[unique_id] = {
-                            'new_month': str(new_m).strip(),
-                            'new_dividend': int(dividend),
-                            'new_payable': int(payable_amount),
-                            'plan_val': plan_val,
-                            'total_bid': total_bid,
-                            'old_month_prefix': unique_id.split('_')[0]
-                        }
-                    except: continue
-
-        if not updates: return "Error: No Valid Inputs"
-
-        # Helper: Month Matcher
-        def is_same_month(m1, m2):
-            s1 = str(m1).strip()
-            s2 = str(m2).strip()
-            if s1 == s2: return True
-            try: return abs(float(s1) - float(s2)) < 0.001
-            except: return False
-
-        # Load Workbooks
-        wb_data = openpyxl.load_workbook(FILE_NAME, data_only=True)
-        source_sheet_data = wb_data.active
-
-        wb = openpyxl.load_workbook(FILE_NAME)
-        source_sheet = wb.active
-        target_sheet = wb.copy_worksheet(source_sheet)
-        target_sheet.title = sheet_name_suffix
-        wb.move_sheet(target_sheet, offset=-len(wb.sheetnames)+1)
-        wb.active = target_sheet
-
-        # Helper: Month Formatter (20 vs 20.0)
-        def process_month_value(val):
-            try:
-                f_val = float(val)
-                if f_val.is_integer(): return int(f_val)
-                return f_val
-            except: return val
-
-        # Map Summary Locations
-        summary_locs = {}
-        for name_col in [20, 24]:
-             for r in range(1, target_sheet.max_row + 1):
-                 name = str(target_sheet.cell(row=r, column=name_col).value).strip().title()
-                 if name and name.upper() not in ['NAN', 'NAME', 'AMOUNT']:
-                     if name not in summary_locs: summary_locs[name] = []
-                     summary_locs[name].append({'row': r, 'col': name_col-1})
-
-        # --- UPDATE LOOP 1: Main Ledger ---
-        for col_start in [1, 6]:
-            curr_member = None
-            block_sum = 0      # Sum of Payable Amount
-            dividend_sum = 0   # Sum of Commission/Dividend
-
-            for row in range(1, target_sheet.max_row + 1):
-                cell_val = str(target_sheet.cell(row=row, column=col_start).value).upper()
-
-                # Header Reset
-                if 'NAME' in cell_val:
-                    curr_member = str(target_sheet.cell(row=row, column=col_start+1).value).strip().title()
-                    target_sheet.cell(row=row, column=col_start+3).value = global_date
-                    block_sum = 0
-                    dividend_sum = 0 # Reset dividend sum for new block
-
-                # Data Row Processing
-                val_check = str(target_sheet.cell(row=row, column=col_start).value).strip()
-                if val_check.replace('.','',1).isdigit():
-                    curr_m = val_check
-                    curr_p = str(target_sheet.cell(row=row, column=col_start+1).value).strip()
-                    curr_pv = clean_plan_amount(curr_p)
-
-                    old_pay_val = source_sheet_data.cell(row=row, column=col_start+3).value
-                    old_pay = clean_num(old_pay_val)
-                    current_item_amt = old_pay
-
-                    # Get existing dividend (for sum calculation if not updated)
-                    old_div_val = source_sheet_data.cell(row=row, column=col_start+2).value
-                    current_dividend = clean_num(old_div_val)
-
-                    matched = None
-                    for uid, upd in updates.items():
-                        if upd['plan_val'] == curr_pv and is_same_month(upd['old_month_prefix'], curr_m):
-                            matched = upd; break
-
-                    if matched:
-                        new_pay = matched['new_payable']
-                        diff = new_pay - old_pay
-
-                        fm = process_month_value(matched['new_month'])
-
-                        target_sheet.cell(row=row, column=col_start).value = fm
-                        target_sheet.cell(row=row, column=col_start+2).value = matched['new_dividend']
-                        target_sheet.cell(row=row, column=col_start+3).value = new_pay
-
-                        current_item_amt = new_pay
-                        current_dividend = matched['new_dividend'] # Update dividend for sum
-
-                        # Update Summary Area (Right side of sheet)
-                        if curr_member and curr_member in summary_locs:
-                            for loc in summary_locs[curr_member]:
-                                old_sum_val = source_sheet_data.cell(row=loc['row'], column=loc['col']).value
-                                old_sum = clean_num(old_sum_val)
-                                target_sheet.cell(row=loc['row'], column=loc['col']).value = int(old_sum) + int(diff)
-
-                    block_sum += current_item_amt
-                    dividend_sum += current_dividend # Add to running total
-
-                # Footer Total Update
-                if 'TOTAL' in cell_val:
-                    target_sheet.cell(row=row, column=col_start+3).value = int(block_sum)
-                    # FIX: Explicitly update the Total Commission cell
-                    target_sheet.cell(row=row, column=col_start+2).value = int(dividend_sum)
-                    block_sum = 0
-                    dividend_sum = 0
-
-        # --- UPDATE LOOP 2: Auction List ---
-        for r in range(2, 100):
-            try:
-                p_val_raw = str(source_sheet_data.cell(row=r, column=13).value)
-                p_val = clean_plan_amount(p_val_raw)
-                m_val = str(source_sheet_data.cell(row=r, column=12).value).strip()
-
-                if p_val > 0:
-                    for uid, upd in updates.items():
-                        if upd['plan_val'] == p_val and is_same_month(upd['old_month_prefix'], m_val):
-                             fm = process_month_value(upd['new_month'])
-                             target_sheet.cell(row=r, column=12).value = fm
-                             target_sheet.cell(row=r, column=14).value = upd['total_bid']
-                             target_sheet.cell(row=r, column=16).value = upd['new_dividend']
-                             target_sheet.cell(row=r, column=18).value = upd['new_payable']
-            except: pass
-
-        wb.save(FILE_NAME)
-        wb_data.close()
-        # SYNC TO CLOUD
-        if USE_CLOUD_STORAGE: sync_up()
-        return redirect(url_for('dashboard'))
-
-    except PermissionError: return "ERROR: Close Excel file!"
-    except Exception as e: return f"Error: {e}\n{traceback.format_exc()}"
-
-# --- ROUTES ---
+# --- AUTHENTICATION ROUTES ---
 @app.route('/')
-def login_page(): return render_template('login.html') if 'user' not in session else redirect(url_for('dashboard'))
-@app.route('/login', methods=['POST'])
-def login_logic():
-    if request.form.get('username') == 'admin' and request.form.get('password') == 'nitesh2025': session['user'] = 'admin'; return redirect(url_for('dashboard'))
-    return render_template('login.html', error="Invalid Credentials")
+def index():
+    if 'user_id' in session:
+        if session.get('role') == 'admin':
+            return redirect(url_for('admin_dashboard'))
+        else:
+            return redirect(url_for('user_dashboard'))
+    return redirect(url_for('login_page'))
+
+@app.route('/login')
+def login_page():
+    if 'user_id' in session:
+        return redirect(url_for('index'))
+    return render_template('login_new.html')
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    
+    user = users_collection.find_one({'username': username})
+    
+    if user and bcrypt.checkpw(password.encode('utf-8'), user['password']):
+        session['user_id'] = str(user['_id'])
+        session['username'] = user['username']
+        session['role'] = user['role']
+        session['name'] = user['name']
+        
+        if user['role'] == 'admin':
+            return jsonify({'success': True, 'redirect': '/admin/dashboard'})
+        else:
+            return jsonify({'success': True, 'redirect': '/user/dashboard'})
+    
+    return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
+
 @app.route('/logout')
-def logout(): session.pop('user', None); return redirect(url_for('login_page'))
-@app.route('/dashboard')
-def dashboard():
-    if 'user' not in session: return redirect(url_for('login_page'))
-    # Get the default (latest) sheet name
-    sheets = get_all_sheet_names()
-    default_sheet = sheets[0] if sheets else "No Data"
-    return render_template('dashboard.html', timestamp=time.time(), active_sheet=default_sheet)
-@app.route('/members')
-def members_page(): return render_template('members.html') if 'user' in session else redirect(url_for('login_page'))
-@app.route('/auction')
-def auction_page(): return render_template('auction.html', groups=get_auction_plans()) if 'user' in session else redirect(url_for('login_page'))
-@app.route('/api/members')
-def get_members_api():
-    # Optional: allow fetching data for a specific sheet (Month)
-    sheet = request.args.get('sheet')
-    return jsonify(get_excel_data(sheet)) if 'user' in session else (jsonify({"error": "Unauthorized"}), 401)
+def logout():
+    session.clear()
+    return redirect(url_for('login_page'))
 
-@app.route('/api/sheets')
-def get_sheets_api():
-    return jsonify({'sheets': get_all_sheet_names()}) if 'user' in session else (jsonify({"error": "Unauthorized"}), 401)
+# --- ADMIN ROUTES ---
+@app.route('/admin/dashboard')
+@login_required(role='admin')
+def admin_dashboard():
+    return render_template('admin_dashboard.html')
 
-# --- EXCEL EDITOR API ---
-@app.route('/api/sheet_data')
-def get_sheet_data_api():
-    if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
+@app.route('/admin/members')
+@login_required(role='admin')
+def admin_members():
+    return render_template('admin_members.html')
+
+@app.route('/admin/auctions')
+@login_required(role='admin')
+def admin_auctions():
+    return render_template('admin_auctions.html')
+
+@app.route('/admin/reports')
+@login_required(role='admin')
+def admin_reports():
+    return render_template('admin_reports.html')
+
+@app.route('/admin/users')
+@login_required(role='admin')
+def admin_users():
+    return render_template('admin_users.html')
+
+# --- USER ROUTES ---
+@app.route('/user/dashboard')
+@login_required()
+def user_dashboard():
+    return render_template('user_dashboard.html')
+
+@app.route('/user/payments')
+@login_required()
+def user_payments():
+    return render_template('user_payments.html')
+
+@app.route('/user/history')
+@login_required()
+def user_history():
+    return render_template('user_history.html')
+
+# --- API ROUTES ---
+
+# Dashboard Stats
+@app.route('/api/admin/stats')
+@login_required(role='admin')
+def admin_stats():
+    total_members = members_collection.count_documents({})
+    total_users = users_collection.count_documents({'role': 'member'})
+    
+    # Calculate total value from latest sheet
+    latest_sheet = sheets_collection.find_one(sort=[('created_at', -1)])
+    sheet_name = latest_sheet['name'] if latest_sheet else None
+    
+    payments = list(payments_collection.find({'sheet_name': sheet_name}))
+    total_value = sum(p.get('amount', 0) for p in payments)
+    paid_value = sum(p.get('paid_amount', 0) for p in payments)
+    pending_value = total_value - paid_value
+    
+    pending_members = len([p for p in payments if not p.get('is_paid', False)])
+    
+    # Recent activities
+    recent_payments = list(payments_collection.find({'is_paid': True}).sort('paid_date', -1).limit(5))
+    
+    return jsonify({
+        'total_members': total_members,
+        'total_users': total_users,
+        'total_value': total_value,
+        'paid_value': paid_value,
+        'pending_value': pending_value,
+        'pending_members': pending_members,
+        'recent_payments': [{
+            'name': members_collection.find_one({'_id': p['member_id']})['name'],
+            'amount': p.get('paid_amount', 0),
+            'date': p.get('paid_date', '').strftime('%Y-%m-%d') if p.get('paid_date') else ''
+        } for p in recent_payments]
+    })
+
+# Members API
+@app.route('/api/admin/members')
+@login_required(role='admin')
+def get_all_members():
     sheet_name = request.args.get('sheet')
-    if not sheet_name: return jsonify({'error': 'No sheet name'}), 400
     
-    try:
-        wb = openpyxl.load_workbook(FILE_NAME, data_only=False) # Get formulas if possible? No, for editing we want values usually, or raw? Jspreadsheet edits values.
-        # Actually data_only=False is better to edit formulas, but for this use case (simple data entry), values are fine. 
-        # But if we write back values, we lose formulas.
-        # Let's stick to data_only=False to read/write what is there.
-        if sheet_name not in wb.sheetnames: return jsonify({'error': 'Sheet not found'}), 404
-        ws = wb[sheet_name]
+    # Get all members
+    members = list(members_collection.find())
+    
+    result = []
+    for member in members:
+        # Get payment info for this member
+        payment = payments_collection.find_one({
+            'member_id': member['_id'],
+            'sheet_name': sheet_name
+        })
         
-        data = []
-        for row in ws.iter_rows(values_only=True):
-            # cell values can be None, datetime, etc. Convert to friendly formats
-            clean_row = []
-            for cell in row:
-                if cell is None: clean_row.append("")
-                elif isinstance(cell, datetime): clean_row.append(cell.strftime('%Y-%m-%d'))
-                else: clean_row.append(str(cell))
-            data.append(clean_row)
-            
-        wb.close()
-        return jsonify({'data': data})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        member_data = {
+            'id': str(member['_id']),
+            'name': member['name'],
+            'area': member['area'],
+            'phone': member.get('phone', ''),
+            'total': payment.get('amount', 0) if payment else 0,
+            'paid_amount': payment.get('paid_amount', 0) if payment else 0,
+            'is_paid': payment.get('is_paid', False) if payment else False,
+            'paid_date': payment.get('paid_date', '').strftime('%Y-%m-%d') if payment and payment.get('paid_date') else None,
+            'items': payment.get('items', []) if payment else []
+        }
+        result.append(member_data)
+    
+    return jsonify(result)
 
-@app.route('/api/delete_sheet', methods=['POST'])
-def delete_sheet_api():
-    if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
-    try:
-        req = request.json
-        sheet_name = req.get('sheet_name')
-        if not sheet_name: return jsonify({'error': 'Missing sheet name'}), 400
-        
-        wb = openpyxl.load_workbook(FILE_NAME)
-        if sheet_name not in wb.sheetnames:
-            wb.close()
-            return jsonify({'error': 'Sheet not found'}), 404
-        
-        if len(wb.sheetnames) <= 1:
-            wb.close()
-            return jsonify({'error': 'Cannot delete the last remaining sheet'}), 400
-            
-        wb.remove(wb[sheet_name])
-        wb.save(FILE_NAME)
-        wb.close()
-        
-        # SYNC TO CLOUD
-        if USE_CLOUD_STORAGE: sync_up()
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+@app.route('/api/admin/members', methods=['POST'])
+@login_required(role='admin')
+def create_member():
+    data = request.json
+    
+    # Create member
+    member = {
+        'name': data['name'],
+        'area': data['area'],
+        'phone': data.get('phone', ''),
+        'created_at': datetime.utcnow()
+    }
+    
+    result = members_collection.insert_one(member)
+    
+    # Create user account if requested
+    if data.get('create_account'):
+        hashed_pw = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
+        users_collection.insert_one({
+            'username': data['username'],
+            'password': hashed_pw,
+            'role': 'member',
+            'name': data['name'],
+            'member_id': result.inserted_id,
+            'created_at': datetime.utcnow()
+        })
+    
+    return jsonify({'success': True, 'id': str(result.inserted_id)})
 
-@app.route('/api/save_sheet_data', methods=['POST'])
-def save_sheet_data_api():
-    if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
-    try:
-        req = request.json
-        sheet_name = req.get('sheet_name')
-        data = req.get('data') # 2D array
-        
-        if not sheet_name or not data: return jsonify({'error': 'Missing data'}), 400
-        
-        wb = openpyxl.load_workbook(FILE_NAME)
-        if sheet_name not in wb.sheetnames: return jsonify({'error': 'Sheet not found'}), 404
-        ws = wb[sheet_name]
-        
-        # We only update cells provided in 'data'. 
-        # CAUTION: 'data' from Jspreadsheet might be the whole sheet or specific changes.
-        # Ideally we expect the whole sheet data back to rewrite it? 
-        # Jspreadsheet .getData() returns the whole grid.
-        
-        for r_idx, row in enumerate(data):
-            for c_idx, val in enumerate(row):
-                # r_idx+1, c_idx+1 because openpyxl is 1-based
-                # Try to preserve types if possible? Everything is str from JSON.
-                # Try converting to int/float if it looks like one
-                clean_val = val
-                if isinstance(val, str):
-                    val = val.strip()
-                    if val.replace('.','',1).isdigit():
-                        try:
-                            if '.' in val: clean_val = float(val)
-                            else: clean_val = int(val)
-                        except: clean_val = val
-                    elif val == "":
-                        clean_val = None
-                
-                ws.cell(row=r_idx+1, column=c_idx+1, value=clean_val)
-                
-        wb.save(FILE_NAME)
-        wb.close()
-        # SYNC TO CLOUD
-        if USE_CLOUD_STORAGE: sync_up()
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+@app.route('/api/admin/members/<member_id>', methods=['PUT'])
+@login_required(role='admin')
+def update_member(member_id):
+    data = request.json
+    
+    members_collection.update_one(
+        {'_id': ObjectId(member_id)},
+        {'$set': {
+            'name': data['name'],
+            'area': data['area'],
+            'phone': data.get('phone', ''),
+            'updated_at': datetime.utcnow()
+        }}
+    )
+    
+    return jsonify({'success': True})
 
-@app.route('/api/toggle-pay', methods=['POST'])
-def toggle_pay():
-    if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
-    item_id = request.json.get('id')
-    if not item_id: return jsonify({'error': 'No ID'}), 400
-    db = load_paid_db()
-    current_entry = db.get(item_id)
-    if current_entry:
-        del db[item_id]
-        new_status = False
-        paid_on = None
+@app.route('/api/admin/members/<member_id>', methods=['DELETE'])
+@login_required(role='admin')
+def delete_member(member_id):
+    members_collection.delete_one({'_id': ObjectId(member_id)})
+    payments_collection.delete_many({'member_id': ObjectId(member_id)})
+    users_collection.delete_one({'member_id': ObjectId(member_id)})
+    
+    return jsonify({'success': True})
+
+# Payment API
+@app.route('/api/admin/toggle-payment', methods=['POST'])
+@login_required(role='admin')
+def toggle_payment():
+    data = request.json
+    member_id = ObjectId(data['member_id'])
+    sheet_name = data['sheet_name']
+    item_id = data.get('item_id')
+    
+    payment = payments_collection.find_one({
+        'member_id': member_id,
+        'sheet_name': sheet_name
+    })
+    
+    if not payment:
+        return jsonify({'error': 'Payment not found'}), 404
+    
+    # Toggle specific item if item_id provided
+    if item_id:
+        items = payment.get('items', [])
+        for item in items:
+            if item['id'] == item_id:
+                item['is_paid'] = not item.get('is_paid', False)
+                item['paid_date'] = datetime.utcnow() if item['is_paid'] else None
+                break
+        
+        # Recalculate paid amount
+        paid_amount = sum(item['amount'] for item in items if item.get('is_paid'))
+        is_paid = paid_amount >= payment['amount']
+        
+        payments_collection.update_one(
+            {'_id': payment['_id']},
+            {'$set': {
+                'items': items,
+                'paid_amount': paid_amount,
+                'is_paid': is_paid,
+                'paid_date': datetime.utcnow() if is_paid else payment.get('paid_date')
+            }}
+        )
     else:
-        # Changed: Use local server time instead of UTC to fix user reported time mistake.
-        now = datetime.now().strftime("%d %b, %I:%M %p")
-        db[item_id] = now
-        new_status = True
-        paid_on = now
-    save_paid_db(db)
-    return jsonify({'success': True, 'new_status': new_status, 'paid_on': paid_on})
+        # Toggle entire payment
+        is_paid = not payment.get('is_paid', False)
+        paid_amount = payment['amount'] if is_paid else 0
+        
+        payments_collection.update_one(
+            {'_id': payment['_id']},
+            {'$set': {
+                'is_paid': is_paid,
+                'paid_amount': paid_amount,
+                'paid_date': datetime.utcnow() if is_paid else None
+            }}
+        )
+    
+    return jsonify({'success': True})
 
-@app.route('/download_excel')
-def download_excel():
-    if 'user' not in session: return redirect(url_for('login_page'))
-    
-    # 1. Get processed data
-    members = get_excel_data() 
-    
-    # 2. Create Workbook using openpyxl directly for formatting
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-    
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Payment Receipts"
-    
-    # Styles
-    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-    header_fill = PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid") # Light Grey
-    bold_font = Font(bold=True)
-    
-    # Column Widths
-    ws.column_dimensions['A'].width = 15 # Month / Label
-    ws.column_dimensions['B'].width = 25 # Plan / Name
-    ws.column_dimensions['C'].width = 25 # Comm / Area
-    ws.column_dimensions['D'].width = 20 # Amount
-    
-    row_idx = 1
-    
-    for m in members:
-        # Sort out date
-        display_date = m.get('paid_date', datetime.now().strftime("%d-%b-%Y"))
-        if not display_date: display_date = datetime.now().strftime("%d-%b-%Y")
-        
-        # --- ROW 1: Header Block [Name Label | Name | Area | Date] ---
-        # Cell A: Name Label
-        c1 = ws.cell(row=row_idx, column=1, value="Name")
-        c1.font = bold_font
-        c1.border = thin_border
-        
-        # Cell B: Name Value
-        c2 = ws.cell(row=row_idx, column=2, value=m['name'])
-        c2.font = bold_font
-        c2.border = thin_border
-        
-        # Cell C: Area Value
-        c3 = ws.cell(row=row_idx, column=3, value=m['area'])
-        c3.font = bold_font
-        c3.border = thin_border
-        
-        # Cell D: Date
-        c4 = ws.cell(row=row_idx, column=4, value=display_date)
-        c4.font = bold_font
-        c4.alignment = Alignment(horizontal='right')
-        c4.border = thin_border
-        
-        row_idx += 1
-        
-        # --- ROW 2: Column Headers [Month | Plan | Commission | Amount] ---
-        headers = ["Month", "Plan", "Commission", "Amount"]
-        for col_num, h_text in enumerate(headers, 1):
-            c = ws.cell(row=row_idx, column=col_num, value=h_text)
-            c.fill = header_fill
-            c.border = thin_border
-        row_idx += 1
-        
-        # --- ROW 3+: Items ---
-        items_to_print = m['items'] if m['items'] else [{'month': '-', 'plan': '-', 'commission': '-', 'amount': m['total']}]
-        
-        for item in items_to_print:
-            # Month
-            ws.cell(row=row_idx, column=1, value=item.get('month', '-')).border = thin_border
-            # Plan
-            # Try to format as number if possible
-            plan_val = item.get('plan', '-')
-            try: plan_val = float(str(plan_val).replace(',','')) 
-            except: pass
-            c_plan = ws.cell(row=row_idx, column=2, value=plan_val)
-            c_plan.border = thin_border
-            if isinstance(plan_val, (int, float)): c_plan.number_format = '#,##0.00'
-            
-            # Commission
-            comm_val = item.get('commission', '-')
-            try: comm_val = float(str(comm_val).replace(',','')) 
-            except: pass
-            c_comm = ws.cell(row=row_idx, column=3, value=comm_val)
-            c_comm.border = thin_border
-            if isinstance(comm_val, (int, float)): c_comm.number_format = '#,##0.00'
+# Sheets API
+@app.route('/api/sheets')
+@login_required()
+def get_sheets():
+    sheets = list(sheets_collection.find().sort('created_at', -1))
+    return jsonify([{'name': s['name'], 'date': s['created_at'].strftime('%Y-%m-%d')} for s in sheets])
 
-            # Amount
-            amt_val = item.get('amount', 0)
-            c_amt = ws.cell(row=row_idx, column=4, value=amt_val)
-            c_amt.border = thin_border
-            c_amt.number_format = '#,##0.00'
-            
-            row_idx += 1
-            
-        # --- ROW N: Empty spacers (to match image style roughly) ---
-        # Image shows some empty grey rows or just space? 
-        # Image has 2 empty rows with grey background before Total. Let's add 1 empty row.
-        for col_num in range(1, 5):
-             ws.cell(row=row_idx, column=col_num).fill = header_fill
-             ws.cell(row=row_idx+1, column=col_num).fill = header_fill
-        row_idx += 2
-
-        # --- ROW Footer: Total Payable ---
-        c_foot_label = ws.cell(row=row_idx, column=1, value="Total Payable")
-        c_foot_label.font = bold_font
-        c_foot_label.fill = header_fill
-        c_foot_label.border = thin_border
-        
-        # Merge B and C for footer or just leave empty? Image shows total at right.
-        ws.cell(row=row_idx, column=2).fill = header_fill
-        ws.cell(row=row_idx, column=2).border = thin_border
-        ws.cell(row=row_idx, column=3).fill = header_fill
-        ws.cell(row=row_idx, column=3).border = thin_border
-        
-        c_foot_val = ws.cell(row=row_idx, column=4, value=m['total'])
-        c_foot_val.font = bold_font
-        c_foot_val.fill = header_fill
-        c_foot_val.border = thin_border
-        c_foot_val.number_format = '#,##0.00'
-        
-        row_idx += 1
-        
-        # Spacer between members
-        row_idx += 3
-
-    # Save to BytesIO
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
+@app.route('/api/sheets', methods=['POST'])
+@login_required(role='admin')
+def create_sheet():
+    data = request.json
     
-    filename = f"Payment_Receipts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    return send_file(output, download_name=filename, as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    sheet = {
+        'name': data['name'],
+        'created_at': datetime.utcnow()
+    }
+    
+    sheets_collection.insert_one(sheet)
+    
+    return jsonify({'success': True})
 
-from itertools import groupby
+# User Dashboard API
+@app.route('/api/user/dashboard')
+@login_required()
+def user_dashboard_api():
+    user = get_current_user()
+    if not user or 'member_id' not in user:
+        return jsonify({'error': 'Member not found'}), 404
+    
+    member = members_collection.find_one({'_id': user['member_id']})
+    
+    # Get latest payments
+    latest_sheet = sheets_collection.find_one(sort=[('created_at', -1)])
+    sheet_name = latest_sheet['name'] if latest_sheet else None
+    
+    payment = payments_collection.find_one({
+        'member_id': user['member_id'],
+        'sheet_name': sheet_name
+    })
+    
+    return jsonify({
+        'name': member['name'],
+        'area': member['area'],
+        'phone': member.get('phone', ''),
+        'total_due': payment.get('amount', 0) if payment else 0,
+        'paid_amount': payment.get('paid_amount', 0) if payment else 0,
+        'pending_amount': (payment.get('amount', 0) - payment.get('paid_amount', 0)) if payment else 0,
+        'is_paid': payment.get('is_paid', False) if payment else False,
+        'items': payment.get('items', []) if payment else []
+    })
 
-@app.route('/view_receipts')
-def view_receipts():
-    if 'user' not in session: return redirect(url_for('login_page'))
+@app.route('/api/user/payment-history')
+@login_required()
+def user_payment_history():
+    user = get_current_user()
+    if not user or 'member_id' not in user:
+        return jsonify({'error': 'Member not found'}), 404
     
-    sheet_names = get_all_sheet_names()
-    # Accept explicit sheet param, else default to latest (index 0)
-    target_sheet = request.args.get('sheet')
-    if not target_sheet and sheet_names:
-        target_sheet = sheet_names[0]
+    payments = list(payments_collection.find({'member_id': user['member_id']}).sort('created_at', -1))
     
-    data_response = get_excel_data(target_sheet)
-    # Handle dict response
-    if isinstance(data_response, dict):
-        members = data_response.get('members', [])
-    else:
-        members = data_response
+    history = []
+    for payment in payments:
+        history.append({
+            'sheet_name': payment['sheet_name'],
+            'amount': payment['amount'],
+            'paid_amount': payment.get('paid_amount', 0),
+            'is_paid': payment.get('is_paid', False),
+            'paid_date': payment.get('paid_date', '').strftime('%Y-%m-%d') if payment.get('paid_date') else None
+        })
     
-    # Sort by Area (primary) and Name (secondary)
-    def sort_key(x):
-        return (str(x.get('area', '')).strip().lower(), str(x.get('name', '')).strip().lower())
-    
-    members.sort(key=sort_key)
-    
-    # Continuous Layout: Return flat list, sorted by Area
-    return render_template('receipt_preview.html', 
-                           members=members, 
-                           now=datetime.now(),
-                           sheet_names=sheet_names,
-                           active_sheet=target_sheet)
+    return jsonify(history)
 
-# --- REPORT ROUTES ---
-@app.route('/reports')
-def reports_page():
-    if 'user' not in session: return redirect(url_for('login_page'))
-    sheets = get_all_sheet_names()
-    return render_template('reports.html', sheets=sheets)
+# Auction API
+@app.route('/api/admin/auctions')
+@login_required(role='admin')
+def get_auctions():
+    auctions = list(auctions_collection.find().sort('date', -1).limit(20))
+    
+    result = []
+    for auction in auctions:
+        result.append({
+            'id': str(auction['_id']),
+            'date': auction['date'].strftime('%Y-%m-%d'),
+            'month': auction.get('month', ''),
+            'plan': auction.get('plan', 0),
+            'bid_amount': auction.get('bid_amount', 0),
+            'winner': auction.get('winner', '')
+        })
+    
+    return jsonify(result)
 
-@app.route('/excel_editor')
-def excel_editor_page():
-    return render_template('excel_editor.html') if 'user' in session else redirect(url_for('login_page'))
+@app.route('/api/admin/auctions', methods=['POST'])
+@login_required(role='admin')
+def create_auction():
+    data = request.json
+    
+    auction = {
+        'date': datetime.strptime(data['date'], '%Y-%m-%d'),
+        'month': data['month'],
+        'plan': data['plan'],
+        'bid_amount': data['bid_amount'],
+        'winner': data.get('winner', ''),
+        'created_at': datetime.utcnow()
+    }
+    
+    auctions_collection.insert_one(auction)
+    
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
-    # Local Dev (Windows)
-    app.run(debug=True)
-else:
-    # Production / WSGI (PythonAnywhere)
-    application = app
+    app.run(debug=True, host='0.0.0.0', port=5000)
