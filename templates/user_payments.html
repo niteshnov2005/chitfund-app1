@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Payments - Chit Fund</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary: #667eea; --success: #48bb78; --danger: #f56565; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f7fafc; }
+        .navbar { background: linear-gradient(135deg, var(--primary), #764ba2);
+            padding: 20px 30px; color: white; display: flex; justify-content: space-between;
+            align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .navbar h1 { font-size: 1.5rem; }
+        .navbar a { color: white; text-decoration: none; padding: 8px 20px;
+            background: rgba(255,255,255,0.2); border-radius: 8px; border: 2px solid white; }
+        .container { max-width: 1000px; margin: 30px auto; padding: 0 20px; }
+        .page-header { background: white; padding: 30px; border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px; }
+        .page-header h2 { font-size: 2rem; margin-bottom: 10px; }
+        .payments-card { background: white; padding: 25px; border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f7fafc; padding: 12px; text-align: left;
+            font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+        td { padding: 12px; border-bottom: 1px solid #f1f1f1; }
+        .badge { padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; }
+        .badge-success { background: #c6f6d5; color: #22543d; }
+        .badge-danger { background: #fed7d7; color: #742a2a; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1><i class="fas fa-coins"></i> My Payments</h1>
+        <div style="display: flex; gap: 15px;">
+            <a href="/user/dashboard">Dashboard</a>
+            <a href="/logout">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h2>Payment Details</h2>
+            <p style="color: #666;">View your current payment breakdown</p>
+        </div>
+
+        <div class="payments-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>Plan</th>
+                        <th>Commission</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Paid Date</th>
+                    </tr>
+                </thead>
+                <tbody id="payments-tbody">
+                    <tr><td colspan="6" style="text-align: center; padding: 30px;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function loadPayments() {
+            try {
+                const response = await fetch('/api/user/dashboard');
+                const data = await response.json();
+                const tbody = document.getElementById('payments-tbody');
+                
+                if (data.items && data.items.length > 0) {
+                    tbody.innerHTML = data.items.map(item => `
+                        <tr>
+                            <td>${item.month}</td>
+                            <td>${item.plan}</td>
+                            <td>${item.commission || '-'}</td>
+                            <td>₹${item.amount.toLocaleString()}</td>
+                            <td><span class="badge badge-${item.is_paid ? 'success' : 'danger'}">
+                                ${item.is_paid ? 'Paid' : 'Pending'}</span></td>
+                            <td>${item.paid_date || '-'}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 30px;">No payment data found</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error loading payments:', error);
+            }
+        }
+        loadPayments();
+    </script>
+</body>
+</html>
