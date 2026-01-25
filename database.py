@@ -6,8 +6,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # MongoDB Connection
-MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
-MONGO_DB = os.getenv('MONGO_DB', 'chitfund_db')
+MONGO_URI = os.getenv('MONGO_URI')
+MONGO_DB = os.getenv('MONGO_DB')
+
+if not MONGO_URI or not MONGO_DB:
+    raise ValueError("MONGO_URI and MONGO_DB environment variables are required")
 
 client = MongoClient(MONGO_URI)
 db = client[MONGO_DB]
