@@ -7,6 +7,7 @@ from database import db, users_collection, members_collection, payments_collecti
 import pandas as pd
 import json
 import io
+import chitfund_web_interface
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')

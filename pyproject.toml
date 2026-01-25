@@ -3,16 +3,15 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "chitfund-web-interface"  # Change this from chitfund-app1
+name = "chitfund-production-app" # This is the unique name for this specific deployment
 version = "0.1.0"
 requires-python = ">=3.12"
 
 dependencies = [
     "flask==3.1.2",
     "pymongo==4.5.0",
-    # The name here must match the name INSIDE the GitHub repo
-    "chitfund-app1 @ git+https://github.com/niteshnov2005/chitfund-app1.git@main"
+    # Change 'chitfund-app1' to 'chitfund-web-interface' to match GitHub's metadata
+    "chitfund-web-interface @ git+https://github.com/niteshnov2005/chitfund-app1.git@main"
 ]
-
 [tool.setuptools.packages.find]
 include = ["backend*"]  # This tells Python only to look at the 'backend' folder
