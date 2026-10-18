@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2c3e50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
+    <link rel="manifest" href="/manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js');
+            });
+        }
+    </script>
+    <title>Member Totals</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-main: #2c3e50;
+            --text-muted: #7f8c8d;
+            --green: #2ecc71;
+            --red: #e74c3c;
+            --orange: #f39c12;
+        }
+
+        /* Dark Mode Variables Override */
+        body.dark-mode {
+            --primary: #ecf0f1;
+            --accent: #3498db;
+            --bg: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #ecf0f1;
+            --text-muted: #b0bec5;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding-top: 90px;
+            /* Space for fixed header */
+        }
+
+        /* Sticky Header */
+        .fixed-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s;
+        }
+
+        body.dark-mode .fixed-header {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            background: rgba(30, 30, 30, 0.9);
+        }
+
+        .search-box {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 20px 12px 45px;
+            border: 2px solid transparent;
+            background: #f0f2f5;
+            border-radius: 50px;
+            outline: none;
+            font-size: 1rem;
+            transition: all 0.3s;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent);
+            background: #fff;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 17px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .btn-back {
+            background: transparent;
+            padding: 10px 20px;
+            border-radius: 20px;
+            text-decoration: none;
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.95rem;
+            border: 1px solid #ddd;
+            transition: all 0.3s;
+        }
+
+        .btn-back:hover {
+            background: var(--primary);
+            color: var(--card-bg);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .theme-toggle {
+            font-size: 1.2rem;
+            cursor: pointer;
+            background: none;
+            border: none;
+            color: var(--primary);
+            margin-right: 15px;
+            transition: transform 0.3s, color 0.3s;
+            display: flex;
+            align-items: center;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1) rotate(15deg);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive Card */
+        .member-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+            border-top: 4px solid var(--orange);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .member-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+        }
+
+        .member-card.status-paid {
+            border-top-color: var(--green);
+        }
+
+        .member-card.status-partial {
+            border-top-color: var(--orange);
+        }
+
+        .row-paid {
+            text-decoration: line-through;
+            color: #bdc3c7;
+            background-color: transparent;
+            opacity: 0.6;
+        }
+
+        input[type="checkbox"] {
+            transform: scale(1.3);
+            accent-color: var(--green);
+            cursor: pointer;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header h2 {
+            margin: 0;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .area-badge {
+            background: rgba(52, 152, 219, 0.1);
+            color: var(--accent);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        /* Scrollable Table for Mobile */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 300px;
+        }
+
+        th {
+            text-align: left;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            padding: 8px 5px;
+            border-bottom: 2px solid var(--text-muted);
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px 5px;
+            border-bottom: 1px solid var(--text-muted);
+            font-size: 0.95rem;
+            color: var(--text-main);
+        }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 15px;
+            border-top: 1px solid #f0f2f5;
+            margin-top: 5px;
+        }
+
+        .total-amount {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .pay-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 150px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            letter-spacing: 0.5px;
+        }
+
+        .pay-btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-unpaid {
+            background: linear-gradient(135deg, #ff7675 0%, #d63031 100%);
+            color: white;
+        }
+
+        .btn-unpaid:hover {
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .btn-paid {
+            background: linear-gradient(135deg, #55efc4 0%, #00b894 100%);
+            color: white;
+        }
+
+        .btn-paid:hover {
+            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
+            transform: translateY(-2px);
+        }
+
+        /* Mobile Layout */
+        @media (max-width: 600px) {
+            .fixed-header {
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch;
+            }
+
+            .btn-back {
+                text-align: center;
+            }
+
+            body {
+                padding-top: 120px;
+            }
+
+            /* More space for stacked header */
+            .card-footer {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .pay-btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="fixed-header">
+        <div class="search-box">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" id="areaSearch" class="search-input" placeholder="Search Name or Area...">
+        </div>
+        <select id="sheetSelect" class="sheet-select"
+            style="margin: 0 10px; padding: 10px 20px; border-radius: 20px; border: 2px solid transparent; background: #f0f2f5; font-family: 'Outfit', sans-serif; font-weight: 600; color: #2c3e50; outline: none; cursor: pointer; transition: 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.02);"
+            onfocus="this.style.background='#fff'; this.style.borderColor='var(--accent)';"
+            onblur="this.style.background='#f0f2f5'; this.style.borderColor='transparent';">
+            <option value="">Loading...</option>
+        </select>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <button onclick="openAddMemberModal()" class="btn-back" style="background: var(--accent); color: white; border-color: var(--accent); cursor: pointer;">
+                <i class="fas fa-user-plus"></i> Add Member
+            </button>
+            <a href="/dashboard" class="btn-back"><i class="fas fa-arrow-left" style="margin-right: 5px;"></i> Dashboard</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="loading" style="text-align:center; padding:20px;">Loading members...</div>
+        <div id="members-list"></div>
+    </div>
+
+    <script>
+        // Init: Load Sheets then Load Members
+        fetch('/api/sheets')
+            .then(res => res.json())
+            .then(data => {
+                const select = document.getElementById('sheetSelect');
+                select.innerHTML = '';
+
+                if (data.sheets && data.sheets.length > 0) {
+                    data.sheets.forEach(sheet => {
+                        const opt = document.createElement('option');
+                        opt.value = sheet;
+                        opt.innerText = sheet;
+                        select.appendChild(opt);
+                    });
+                    // Select the FIRST sheet by default (User Preference)
+                    select.selectedIndex = 0;
+                    loadMembers(select.value);
+                } else {
+                    select.innerHTML = '<option>No Sheets</option>';
+                    document.getElementById('loading').innerText = 'No Data Found';
+                }
+            });
+
+        document.getElementById('sheetSelect').addEventListener('change', (e) => {
+            loadMembers(e.target.value);
+        });
+
+        function loadMembers(sheetName) {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('members-list').innerHTML = '';
+
+            fetch(`/api/members?sheet=${encodeURIComponent(sheetName)}&t=` + new Date().getTime())
+                .then(res => res.json())
+                .then(responseData => {
+                    const members = Array.isArray(responseData) ? responseData : (responseData.members || []);
+                    renderMembers(members);
+                });
+        }
+
+        // Search Logic
+        document.getElementById('areaSearch').addEventListener('keyup', (e) => {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('.member-card').forEach(card => {
+                const text = card.innerText.toLowerCase();
+                card.style.display = text.includes(term) ? 'flex' : 'none';
+            });
+        });
+
+        function renderMembers(members) {
+            document.getElementById('loading').style.display = 'none';
+            const container = document.getElementById('members-list');
+            container.innerHTML = '';
+
+            // Sort: Unpaid/Partial first, then Fully Paid
+            members.sort((a, b) => {
+                // Percentage paid
+                const aPct = a.total > 0 ? (a.paid_amount / a.total) : 1;
+                const bPct = b.total > 0 ? (b.paid_amount / b.total) : 1;
+                if (aPct === bPct) return 0;
+                return aPct > bPct ? 1 : -1;
+            });
+
+            members.forEach(m => {
+                let rows = m.items.map(i => {
+                    const isItemPaid = i.is_paid;
+                    const checkState = isItemPaid ? 'checked' : '';
+                    const rowClass = isItemPaid ? 'row-paid' : '';
+
+                    return `
+                    <tr class="${rowClass}" id="row-${i.id}">
+                        <td>
+                            <input type="checkbox" class="item-check" 
+                                   id="chk-${i.id}" 
+                                   ${checkState} 
+                                   onclick="toggleItem('${i.id}', this.checked, ${i.amount}, '${m.payment_id}')">
+                        </td>
+                        <td>${i.month}</td>
+                        <td>${i.plan}</td>
+                        <td align="right">₹${i.amount.toLocaleString()}</td>
+                        <td align="right">
+                            <input type="number" 
+                                   class="partial-pay-input" 
+                                   id="pay-${i.id}" 
+                                   value="${i.paid_amount || 0}" 
+                                   style="width: 75px; text-align: right; border: 1px solid #ccc; border-radius: 4px; padding: 4px;"
+                                   onchange="updatePartialPay('${i.id}', this.value, '${m.payment_id}')">
+                        </td>
+                    </tr>`;
+                }).join('');
+
+                if (!rows) rows = '<tr><td colspan="5" align="center" style="color:#aaa">No active dues</td></tr>';
+
+                // Status Logic
+                const isFullyPaid = m.is_paid; // Calculated in backend
+                const isPartial = m.paid_amount > 0 && m.paid_amount < m.total;
+
+                let statusClass = '';
+                if (isFullyPaid) statusClass = 'status-paid';
+                else if (isPartial) statusClass = 'status-partial';
+
+                const unpaidAmount = m.total - m.paid_amount;
+
+                container.innerHTML += `
+                <div class="member-card ${statusClass}" id="card-${m.payment_id}">
+                    <div class="card-header">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <h2>${m.name}</h2>
+                                <button onclick="openEditMemberModal('${m.name.replace(/'/g, "\\'")}', '${m.area.replace(/'/g, "\\'")}')" style="background: none; border: none; color: var(--accent); cursor: pointer; font-size: 1rem; padding: 0;" title="Edit Details">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="deleteMember('${m.name.replace(/'/g, "\\'")}', '${m.area.replace(/'/g, "\\'")}')" style="background: none; border: none; color: var(--red); cursor: pointer; font-size: 1rem; padding: 0;" title="Delete Member">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                            <span class="area-badge">${m.area}</span>
+                        </div>
+                        <div style="text-align:right">
+                            <div style="font-size:0.8rem; color:#777;">Paid / Total</div>
+                            <div style="font-weight:bold;">
+                                <span id="paid-${m.payment_id}">₹${m.paid_amount.toLocaleString()}</span> / 
+                                ₹${m.total.toLocaleString()}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th style="width:30px">Pay</th><th>Mo</th><th>Plan</th><th align="right">Amt</th><th align="right">Paid</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                    ${m.is_paid && m.paid_date ? `<div style="text-align:right; font-size:0.75rem; color:green; padding:5px;">Last Paid: ${m.paid_date}</div>` : ''}
+                </div>
+            `;
+            });
+        }
+
+        function toggleItem(itemId, isChecked, fullAmount, memberId) {
+            const row = document.getElementById(`row-${itemId}`);
+            const input = document.getElementById(`pay-${itemId}`);
+
+            let payAmount = 0;
+            if (isChecked) {
+                payAmount = fullAmount;
+                if (row) row.classList.add('row-paid');
+                if (input) input.value = fullAmount;
+            } else {
+                if (row) row.classList.remove('row-paid');
+                if (input) input.value = 0;
+            }
+
+            sendPaymentUpdate(itemId, payAmount, memberId);
+        }
+
+        function updatePartialPay(itemId, value, memberId) {
+            let payAmount = parseFloat(value) || 0;
+            sendPaymentUpdate(itemId, payAmount, memberId);
+        }
+
+        function sendPaymentUpdate(itemId, amount, memberId) {
+            fetch('/api/toggle-pay', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: itemId, amount: amount })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        fetch('/api/members?t=' + new Date().getTime())
+                            .then(res => res.json())
+                            .then(response => {
+                                const newData = Array.isArray(response) ? response : (response.members || []);
+                                const updatedMember = newData.find(x => x.payment_id === memberId);
+                                if (updatedMember) renderSingleMember(updatedMember);
+                            });
+                    }
+                });
+        }
+
+        function renderSingleMember(m) {
+            const card = document.getElementById(`card-${m.payment_id}`);
+            if (!card) return;
+
+            let rows = m.items.map(i => {
+                const isItemPaid = i.is_paid;
+                const checkState = isItemPaid ? 'checked' : '';
+                const rowClass = isItemPaid ? 'row-paid' : '';
+
+                return `
+                <tr class="${rowClass}" id="row-${i.id}">
+                    <td>
+                        <input type="checkbox" class="item-check" 
+                               id="chk-${i.id}" 
+                               ${checkState} 
+                               onclick="toggleItem('${i.id}', this.checked, ${i.amount}, '${m.payment_id}')">
+                    </td>
+                    <td>${i.month}</td>
+                    <td>${i.plan}</td>
+                    <td align="right">₹${i.amount.toLocaleString()}</td>
+                    <td align="right">
+                        <input type="number" 
+                               class="partial-pay-input" 
+                               id="pay-${i.id}" 
+                               value="${i.paid_amount || 0}" 
+                               style="width: 75px; text-align: right; border: 1px solid #ccc; border-radius: 4px; padding: 4px;"
+                               onchange="updatePartialPay('${i.id}', this.value, '${m.payment_id}')">
+                    </td>
+                </tr>`;
+            }).join('');
+
+            if (!rows) rows = '<tr><td colspan="5" align="center" style="color:#aaa">No active dues</td></tr>';
+
+            const isFullyPaid = m.is_paid;
+            const isPartial = m.paid_amount > 0 && m.paid_amount < m.total;
+
+            let statusClass = '';
+            if (isFullyPaid) statusClass = 'status-paid';
+            else if (isPartial) statusClass = 'status-partial';
+
+            card.className = `member-card ${statusClass}`;
+            card.innerHTML = `
+                <div class="card-header">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <h2>${m.name}</h2>
+                            <button onclick="openEditMemberModal('${m.name.replace(/'/g, "\\'")}', '${m.area.replace(/'/g, "\\'")}')" style="background: none; border: none; color: var(--accent); cursor: pointer; font-size: 1rem; padding: 0;" title="Edit Details">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteMember('${m.name.replace(/'/g, "\\'")}', '${m.area.replace(/'/g, "\\'")}')" style="background: none; border: none; color: var(--red); cursor: pointer; font-size: 1rem; padding: 0;" title="Delete Member">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                        <span class="area-badge">${m.area}</span>
+                    </div>
+                    <div style="text-align:right">
+                        <div style="font-size:0.8rem; color:#777;">Paid / Total</div>
+                        <div style="font-weight:bold;">
+                            <span id="paid-${m.payment_id}">₹${m.paid_amount.toLocaleString()}</span> / 
+                            ₹${m.total.toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th style="width:30px">Pay</th><th>Mo</th><th>Plan</th><th align="right">Amt</th><th align="right">Paid</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+                ${m.is_paid && m.paid_date ? `<div style="text-align:right; font-size:0.75rem; color:green; padding:5px;">Last Paid: ${m.paid_date}</div>` : ''}
+            `;
+        }
+
+        // --- Dark Theme Toggle Logic ---
+        function toggleTheme() {
+            document.body.classList.toggle('dark-mode');
+            const icon = document.querySelector('#themeIcon i');
+
+            if (document.body.classList.contains('dark-mode')) {
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+                localStorage.setItem('theme', 'light');
+            }
+        }
+
+        // Initialize Theme
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+            const icon = document.querySelector('#themeIcon i');
+            if (icon) {
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+            }
+        }
+
+        // --- MEMBER MANAGEMENT MODAL & API FUNCTIONS ---
+        function openAddMemberModal() {
+            document.getElementById('modalTitle').innerText = 'Add New Member';
+            document.getElementById('editOldName').value = '';
+            document.getElementById('editOldArea').value = '';
+            document.getElementById('memberName').value = '';
+            document.getElementById('memberArea').value = '';
+            document.getElementById('memberModal').style.display = 'flex';
+        }
+
+        function openEditMemberModal(name, area) {
+            document.getElementById('modalTitle').innerText = 'Edit Member Details';
+            document.getElementById('editOldName').value = name;
+            document.getElementById('editOldArea').value = area;
+            document.getElementById('memberName').value = name;
+            document.getElementById('memberArea').value = area;
+            document.getElementById('memberModal').style.display = 'flex';
+        }
+
+        function closeMemberModal() {
+            document.getElementById('memberModal').style.display = 'none';
+        }
+
+        function saveMember() {
+            const name = document.getElementById('memberName').value.trim();
+            const area = document.getElementById('memberArea').value.trim();
+            const oldName = document.getElementById('editOldName').value;
+            const oldArea = document.getElementById('editOldArea').value;
+
+            if (!name || !area) {
+                alert('Please enter both Name and Area.');
+                return;
+            }
+
+            const isEdit = oldName !== '';
+            const endpoint = isEdit ? '/api/edit_member' : '/api/add_member';
+            const payload = isEdit 
+                ? { old_name: oldName, old_area: oldArea, new_name: name, new_area: area }
+                : { name: name, area: area };
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    closeMemberModal();
+                    // Reload current sheet
+                    const currentSheet = document.getElementById('sheetSelect').value;
+                    loadMembers(currentSheet);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(err => alert('Network error while saving member.'));
+        }
+
+        function deleteMember(name, area) {
+            if (!confirm(`Are you sure you want to delete member "${name}" from all sheets? This cannot be undone.`)) {
+                return;
+            }
+
+            fetch('/api/delete_member', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, area: area })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload current sheet
+                    const currentSheet = document.getElementById('sheetSelect').value;
+                    loadMembers(currentSheet);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(err => alert('Network error while deleting member.'));
+        }
+    </script>
+
+    <!-- Add/Edit Member Modal -->
+    <div id="memberModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+        <div style="background: var(--card-bg); color: var(--text-main); padding: 30px; border-radius: 16px; width: 90%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 15px;">
+            <h2 id="modalTitle" style="margin: 0; font-weight: 700;">Add New Member</h2>
+            
+            <input type="hidden" id="editOldName">
+            <input type="hidden" id="editOldArea">
+            
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-weight: 600; font-size: 0.9rem;">Member Name</label>
+                <input type="text" id="memberName" style="padding: 10px 15px; border-radius: 8px; border: 1px solid #ccc; font-family: 'Outfit', sans-serif; font-size: 1rem; background: var(--bg); color: var(--text-main);">
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-weight: 600; font-size: 0.9rem;">Area</label>
+                <input type="text" id="memberArea" style="padding: 10px 15px; border-radius: 8px; border: 1px solid #ccc; font-family: 'Outfit', sans-serif; font-size: 1rem; background: var(--bg); color: var(--text-main);">
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+                <button onclick="closeMemberModal()" class="btn-back" style="cursor: pointer; padding: 8px 16px; border-radius: 20px;">Cancel</button>
+                <button onclick="saveMember()" class="btn-back" style="background: var(--accent); color: white; border-color: var(--accent); cursor: pointer; padding: 8px 16px; border-radius: 20px;">Save</button>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
