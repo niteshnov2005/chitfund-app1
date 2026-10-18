@@ -1,7 +1,0 @@
-flask
-pandas
-openpyxl
-gunicorn
-supabase
-Pillow
-requests
