@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2c3e50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
+    <link rel="manifest" href="/manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js');
+            });
+        }
+    </script>
+    <title>Chit Fund Auction Wizard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-main: #2c3e50;
+            --text-muted: #7f8c8d;
+            --green: #2ecc71;
+            --red: #e74c3c;
+            --orange: #f39c12;
+            --purple: #9b59b6;
+        }
+
+        body.dark-mode {
+            --primary: #ecf0f1;
+            --accent: #3498db;
+            --bg: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #ecf0f1;
+            --text-muted: #b0bec5;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            transition: background 0.3s, color 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 24px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.05);
+            border-top: 5px solid var(--accent);
+            animation: slideUp 0.5s ease-out;
+            margin-bottom: 50px;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 0 0 30px 0;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Wizard Progress Bar */
+        .wizard-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            position: relative;
+            padding: 0 10px;
+        }
+
+        .wizard-steps::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: rgba(0, 0, 0, 0.05);
+            z-index: 1;
+            transform: translateY(-50%);
+        }
+
+        body.dark-mode .wizard-steps::before {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .step-node {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--card-bg);
+            border: 3px solid #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            z-index: 2;
+            transition: all 0.3s;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        body.dark-mode .step-node {
+            border-color: #444;
+        }
+
+        .step-node.active {
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 15px rgba(52, 152, 219, 0.2);
+            transform: scale(1.1);
+        }
+
+        .step-node.completed {
+            border-color: var(--green);
+            background: var(--green);
+            color: white;
+        }
+
+        .step-label {
+            position: absolute;
+            font-size: 0.75rem;
+            font-weight: 600;
+            bottom: -22px;
+            width: 100px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .step-wrapper {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .step-wrapper.active .step-label {
+            color: var(--accent);
+        }
+
+        /* Step Panels */
+        .step-panel {
+            display: none;
+            animation: fadeIn 0.4s ease-in-out;
+        }
+
+        .step-panel.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Tables & Inputs styling */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        th {
+            background: rgba(0, 0, 0, 0.02);
+            color: var(--text-muted);
+            font-weight: 600;
+            text-align: left;
+            padding: 12px 15px;
+            font-size: 0.9rem;
+            border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+        }
+
+        body.dark-mode th {
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom-color: rgba(255, 255, 255, 0.05);
+        }
+
+        td {
+            padding: 12px 15px;
+            font-size: 0.95rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        body.dark-mode td {
+            border-bottom-color: rgba(255, 255, 255, 0.05);
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="date"],
+        select {
+            width: 100%;
+            padding: 10px 15px;
+            border: 2px solid transparent;
+            background: rgba(0, 0, 0, 0.03);
+            border-radius: 10px;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+            color: var(--text-main);
+            transition: 0.3s;
+        }
+
+        body.dark-mode input[type="text"],
+        body.dark-mode input[type="number"],
+        body.dark-mode input[type="date"],
+        body.dark-mode select {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        select option {
+            background-color: #ffffff;
+            color: #2c3e50;
+        }
+        body.dark-mode select option {
+            background-color: #1e1e1e;
+            color: #ecf0f1;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--accent);
+            background: var(--card-bg);
+            outline: none;
+        }
+
+        /* Buttons styling */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 30px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Outfit', sans-serif;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid #ddd;
+        }
+
+        body.dark-mode .btn-secondary {
+            border-color: #444;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(0, 0, 0, 0.03);
+            color: var(--text-main);
+        }
+
+        .btn-danger {
+            background: var(--red);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
+        }
+
+        /* Search & Members Grid */
+        .search-box {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search-box i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .search-box input {
+            padding-left: 40px;
+        }
+
+        .members-list-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            border-radius: 12px;
+            padding: 10px;
+        }
+
+        body.dark-mode .members-list-container {
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .member-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.02);
+            transition: background 0.2s;
+            border-radius: 8px;
+        }
+
+        .member-row:hover {
+            background: rgba(52, 152, 219, 0.05);
+        }
+
+        .area-badge {
+            background: rgba(52, 152, 219, 0.1);
+            color: var(--accent);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* Footer Nav */
+        .footer-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        body.dark-mode .footer-nav {
+            border-top-color: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-card {
+            background: var(--card-bg);
+            color: var(--text-main);
+            padding: 30px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <!-- Top Navigation -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 25px;">
+            <a href="/dashboard" class="btn-secondary btn" style="border-radius: 20px; padding: 8px 16px;">
+                <i class="fas fa-arrow-left"></i> Dashboard
+            </a>
+            <button class="theme-toggle" onclick="toggleTheme()" id="themeIcon" title="Toggle Dark/Light Mode">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+
+        <h1>Chit Fund Auction Setup Wizard</h1>
+
+        <!-- Steps Progress Bar -->
+        <div class="wizard-steps">
+            <div class="step-wrapper active" id="stepNode1" onclick="goToStep(1)">
+                <div class="step-node active">1</div>
+                <div class="step-label">Manage Plans</div>
+            </div>
+            <div class="step-wrapper" id="stepNode2" onclick="goToStep(2)">
+                <div class="step-node">2</div>
+                <div class="step-label">Members & Dues</div>
+            </div>
+            <div class="step-wrapper" id="stepNode3" onclick="goToStep(3)">
+                <div class="step-node">3</div>
+                <div class="step-label">Run Auction</div>
+            </div>
+        </div>
+
+        <!-- STEP 1: PLANS MANAGEMENT -->
+        <div class="step-panel active" id="stepPanel1">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0; font-weight:700;">Active Auction Plans</h3>
+                <button onclick="openPlanModal()" class="btn btn-primary" style="padding: 8px 16px; border-radius: 20px; font-size:0.85rem;">
+                    <i class="fas fa-plus"></i> Add Plan
+                </button>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>Plan Amount</th>
+                        <th style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="plans-table-body">
+                    {% for g in groups %}
+                    <tr id="plan-row-{{ g.id }}">
+                        <td><strong>{{ g.current_month }}</strong></td>
+                        <td>₹{{ g.plan_display }}</td>
+                        <td align="right">
+                            <button onclick="openPlanModal('{{ g.current_month }}', '{{ g.plan_value }}')" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:1.1rem; margin-right: 10px;">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deletePlan('{{ g.current_month }}', '{{ g.plan_value }}')" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:1.1rem;">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- STEP 2: MEMBERS & DUES MANAGEMENT -->
+        <div class="step-panel" id="stepPanel2">
+            <h3 style="margin-top:0; margin-bottom:15px; font-weight:700;">Manage Members & Plan Assignments</h3>
+            
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="memberSearch" placeholder="Search Member Name or Area..." onkeyup="filterMembersList()">
+            </div>
+
+            <div class="members-list-container" id="members-wizard-list">
+                <!-- Dynamically loaded -->
+                <div style="text-align:center; padding: 20px; color:var(--text-muted);">Loading members directory...</div>
+            </div>
+        </div>
+
+        <!-- STEP 3: RUN AUCTION -->
+        <div class="step-panel" id="stepPanel3">
+            <h3 style="margin-top:0; margin-bottom:20px; font-weight:700;">Enter Auction Bids & Select Winners</h3>
+            
+            <form action="/run-auction-batch" method="POST" id="auctionForm">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom: 25px;">
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:0.9rem; margin-bottom:5px; display:block;">Global Date (Receipt Date)</label>
+                        <input type="date" name="global_date" required id="globalDateInput">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:0.9rem; margin-bottom:5px; display:block;">New Sheet Name (e.g. Dec-2025)</label>
+                        <input type="text" name="sheet_name" placeholder="Name for the new Excel Tab" required id="sheetNameInput">
+                    </div>
+                </div>
+
+                <div id="auction-plans-bids-list">
+                    <!-- Dynamically populated to include winner selection -->
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding: 15px; border-radius:30px; font-size:1.1rem; margin-top:20px;">
+                    <i class="fas fa-file-excel"></i> Generate New Sheet & Run Auction
+                </button>
+            </form>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="footer-nav">
+            <button id="btnPrev" class="btn btn-secondary" onclick="prevStep()" style="visibility:hidden;">
+                <i class="fas fa-chevron-left"></i> Previous Step
+            </button>
+            <button id="btnNext" class="btn btn-primary" onclick="nextStep()">
+                Next Step <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD / EDIT PLAN -->
+    <div id="planModal" class="modal-overlay">
+        <div class="modal-card">
+            <h2 id="planModalTitle" style="margin: 0; font-weight: 700;">Add New Plan</h2>
+            <input type="hidden" id="editOldPlanMonth">
+            <input type="hidden" id="editOldPlanAmount">
+            
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-weight: 600; font-size: 0.9rem;">Month Number (e.g. 1 or 14.1)</label>
+                <input type="number" step="any" id="planMonth" style="background:var(--bg);">
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-weight: 600; font-size: 0.9rem;">Plan Amount (e.g. 500000)</label>
+                <input type="number" id="planAmount" style="background:var(--bg);">
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+                <button onclick="closePlanModal()" class="btn btn-secondary" style="padding: 8px 16px; border-radius: 20px;">Cancel</button>
+                <button onclick="savePlan()" class="btn btn-primary" style="padding: 8px 16px; border-radius: 20px;">Save Plan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT MEMBER DETAILS -->
+    <div id="memberEditModal" class="modal-overlay">
+        <div class="modal-card">
+            <h2 style="margin: 0; font-weight: 700;">Edit Member Details</h2>
+            <input type="hidden" id="editOldMemberName">
+            <input type="hidden" id="editOldMemberArea">
+            
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-weight: 600; font-size: 0.9rem;">Name</label>
+                <input type="text" id="editMemberName" style="background:var(--bg);">
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-weight: 600; font-size: 0.9rem;">Area</label>
+                <input type="text" id="editMemberArea" style="background:var(--bg);">
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+                <button onclick="closeMemberEditModal()" class="btn btn-secondary" style="padding: 8px 16px; border-radius: 20px;">Cancel</button>
+                <button onclick="saveMemberDetails()" class="btn btn-primary" style="padding: 8px 16px; border-radius: 20px;">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: MANAGE MEMBER DUES (PLAN LINES) -->
+    <div id="memberDuesModal" class="modal-overlay">
+        <div class="modal-card" style="max-width: 600px;">
+            <h2 id="duesModalTitle" style="margin: 0; font-weight: 700;">Manage Member Plan Lines</h2>
+            <p id="duesModalSub" style="color:var(--text-muted); margin:0; font-size:0.85rem;"></p>
+            
+            <!-- Table of plan lines -->
+            <div style="max-height: 250px; overflow-y: auto; margin-top: 10px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Plan Amount</th>
+                            <th>Commission</th>
+                            <th>Amount</th>
+                            <th style="text-align: right;">Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody id="member-dues-table-body">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Add new plan line form -->
+            <div style="border-top:1px solid rgba(0,0,0,0.05); padding-top:15px; display:flex; flex-direction:column; gap:10px;">
+                <h4 style="margin:0; font-weight:700;">Add Plan Assignment</h4>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <select id="addDueSelectPlan">
+                        <option value="">Select Plan...</option>
+                    </select>
+                    <button onclick="addPlanAssignment()" class="btn btn-primary" style="padding: 8px 16px; border-radius: 20px; justify-content:center;">
+                        <i class="fas fa-plus"></i> Assign Plan
+                    </button>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+                <button onclick="closeMemberDuesModal()" class="btn btn-secondary" style="padding: 8px 16px; border-radius: 20px; width:100px; justify-content:center;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        let globalMembers = [];
+        let globalPlans = [];
+
+        // Parse Jinja Groups to JS array
+        {% for g in groups %}
+        globalPlans.push({
+            id: '{{ g.id }}',
+            current_month: '{{ g.current_month }}',
+            plan_display: '{{ g.plan_display }}',
+            plan_value: parseInt('{{ g.plan_value }}')
+        });
+        {% endfor %}
+
+        // 1. Navigation Flow
+        function showStep(step) {
+            document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.step-node').forEach(n => n.classList.remove('active'));
+            document.querySelectorAll('.step-wrapper').forEach(w => w.classList.remove('active'));
+
+            document.getElementById('stepPanel' + step).classList.add('active');
+            
+            for (let s = 1; s <= 3; s++) {
+                const node = document.querySelector(`#stepNode${s} .step-node`);
+                const wrapper = document.getElementById('stepNode' + s);
+                if (s < step) {
+                    node.classList.add('completed');
+                    node.innerText = '✓';
+                } else {
+                    node.classList.remove('completed');
+                    node.innerText = s;
+                }
+                if (s === step) {
+                    node.classList.add('active');
+                    wrapper.classList.add('active');
+                }
+            }
+
+            // Buttons visibility
+            document.getElementById('btnPrev').style.visibility = step === 1 ? 'hidden' : 'visible';
+            const btnNext = document.getElementById('btnNext');
+            if (step === 3) {
+                btnNext.style.display = 'none'; // Step 3 submits the form
+            } else {
+                btnNext.style.display = 'inline-flex';
+                btnNext.innerHTML = `Next Step <i class="fas fa-chevron-right"></i>`;
+            }
+
+            currentStep = step;
+        }
+
+        function nextStep() {
+            if (currentStep === 1) {
+                // Preload Step 2 members directory and Step 3 winner options
+                loadMembersDirectory();
+                showStep(2);
+            } else if (currentStep === 2) {
+                // Populate Step 3 lists
+                populateAuctionStep();
+                showStep(3);
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                showStep(currentStep - 1);
+            }
+        }
+
+        function goToStep(step) {
+            if (step === 2 && currentStep === 1) {
+                nextStep();
+            } else if (step === 3 && currentStep < 3) {
+                if (currentStep === 1) nextStep();
+                nextStep();
+            } else if (step < currentStep) {
+                showStep(step);
+            }
+        }
+
+        // 2. Fetch Directory
+        function loadMembersDirectory() {
+            const container = document.getElementById('members-wizard-list');
+            container.innerHTML = '<div style="text-align:center; padding: 20px; color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading directory...</div>';
+
+            fetch('/api/members?t=' + new Date().getTime())
+                .then(res => res.json())
+                .then(data => {
+                    globalMembers = data.members || [];
+                    renderMembersDirectory();
+                    populatePlansSelect();
+                })
+                .catch(err => {
+                    container.innerHTML = '<div style="text-align:center; padding: 20px; color:var(--red);">Error loading directory.</div>';
+                });
+        }
+
+        function renderMembersDirectory() {
+            const container = document.getElementById('members-wizard-list');
+            container.innerHTML = '';
+
+            if (globalMembers.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding: 20px; color:var(--text-muted);">No members found.</div>';
+                return;
+            }
+
+            globalMembers.forEach(m => {
+                const item = document.createElement('div');
+                item.className = 'member-row';
+                item.innerHTML = `
+                    <div>
+                        <strong style="font-size:1rem;">${m.name}</strong>
+                        <span class="area-badge" style="margin-left: 10px;">${m.area}</span>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:3px;">
+                            Active Plan Lines: ${m.items ? m.items.length : 0}
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="openMemberEditModal('${m.name.replace(/'/g, "\\'")}', '${m.area.replace(/'/g, "\\'")}')" class="btn btn-secondary" style="padding: 6px 12px; font-size:0.8rem; border-radius:15px;">
+                            <i class="fas fa-user-edit"></i> Edit Info
+                        </button>
+                        <button onclick="openMemberDuesModal('${m.name.replace(/'/g, "\\'")}', '${m.area.replace(/'/g, "\\'")}')" class="btn btn-primary" style="padding: 6px 12px; font-size:0.8rem; border-radius:15px; background:var(--purple);">
+                            <i class="fas fa-tasks"></i> Edit Plans/Dues
+                        </button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function filterMembersList() {
+            const term = document.getElementById('memberSearch').value.toLowerCase();
+            document.querySelectorAll('.member-row').forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(term) ? 'flex' : 'none';
+            });
+        }
+
+        // 3. Modals Controls (Plans)
+        function openPlanModal(month = '', amount = '') {
+            document.getElementById('planMonth').value = month;
+            document.getElementById('planAmount').value = amount;
+            document.getElementById('editOldPlanMonth').value = month;
+            document.getElementById('editOldPlanAmount').value = amount;
+            document.getElementById('planModalTitle').innerText = month ? 'Edit Plan Details' : 'Add New Plan';
+            document.getElementById('planModal').style.display = 'flex';
+        }
+
+        function closePlanModal() {
+            document.getElementById('planModal').style.display = 'none';
+        }
+
+        function savePlan() {
+            const month = document.getElementById('planMonth').value.trim();
+            const amount = document.getElementById('planAmount').value.trim();
+            const oldMonth = document.getElementById('editOldPlanMonth').value;
+            const oldAmount = document.getElementById('editOldPlanAmount').value;
+
+            if (!month || !amount) {
+                alert('Please enter both Month and Plan Amount.');
+                return;
+            }
+
+            const isEdit = oldMonth !== '';
+            const endpoint = isEdit ? '/api/edit_plan' : '/api/add_plan';
+            const payload = isEdit 
+                ? { old_month: oldMonth, old_plan: oldAmount, new_month: month, new_plan: amount }
+                : { month: month, plan_amount: amount };
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Plan details updated!');
+                    closePlanModal();
+                    location.reload(); // Reload page to update groups
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+        }
+
+        function deletePlan(month, plan) {
+            if (!confirm(`Are you sure you want to delete plan: Month ${month}, Amount ₹${parseInt(plan).toLocaleString()}?`)) {
+                return;
+            }
+            fetch('/api/delete_plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ month: month, plan: plan })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Plan deleted!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+        }
+
+        // 4. Member Info Modal
+        function openMemberEditModal(name, area) {
+            document.getElementById('editOldMemberName').value = name;
+            document.getElementById('editOldMemberArea').value = area;
+            document.getElementById('editMemberName').value = name;
+            document.getElementById('editMemberArea').value = area;
+            document.getElementById('memberEditModal').style.display = 'flex';
+        }
+
+        function closeMemberEditModal() {
+            document.getElementById('memberEditModal').style.display = 'none';
+        }
+
+        function saveMemberDetails() {
+            const name = document.getElementById('editMemberName').value.trim();
+            const area = document.getElementById('editMemberArea').value.trim();
+            const oldName = document.getElementById('editOldMemberName').value;
+            const oldArea = document.getElementById('editOldMemberArea').value;
+
+            if (!name || !area) {
+                alert('Please enter both name and area.');
+                return;
+            }
+
+            fetch('/api/edit_member', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ old_name: oldName, old_area: oldArea, new_name: name, new_area: area })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Member details updated!');
+                    closeMemberEditModal();
+                    loadMembersDirectory();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+        }
+
+        // 5. Member Dues Modal
+        let activeDuesMember = null;
+
+        function openMemberDuesModal(name, area) {
+            const member = globalMembers.find(m => m.name === name && m.area === area);
+            if (!member) return;
+
+            activeDuesMember = member;
+            document.getElementById('duesModalTitle').innerText = member.name;
+            document.getElementById('duesModalSub').innerText = 'Area: ' + member.area;
+            
+            renderMemberDuesTable();
+            document.getElementById('memberDuesModal').style.display = 'flex';
+        }
+
+        function closeMemberDuesModal() {
+            document.getElementById('memberDuesModal').style.display = 'none';
+            activeDuesMember = null;
+        }
+
+        function renderMemberDuesTable() {
+            const tbody = document.getElementById('member-dues-table-body');
+            tbody.innerHTML = '';
+
+            const items = activeDuesMember.items || [];
+            if (items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" align="center" style="color:var(--text-muted); padding:15px;">No active plan lines assigned</td></tr>';
+                return;
+            }
+
+            items.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${item.month}</strong></td>
+                    <td>₹${parseInt(item.plan).toLocaleString()}</td>
+                    <td>${item.commission}</td>
+                    <td>₹${item.amount.toLocaleString()}</td>
+                    <td align="right">
+                        <button onclick="deletePlanAssignment('${item.month}', '${item.plan}')" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:1.1rem;">
+                            <i class="fas fa-times-circle"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function populatePlansSelect() {
+            const select = document.getElementById('addDueSelectPlan');
+            select.innerHTML = '<option value="">Select Plan...</option>';
+            
+            globalPlans.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.current_month + '_' + p.plan_value;
+                opt.innerText = `Mo ${p.current_month} - ₹${p.plan_display}`;
+                select.appendChild(opt);
+            });
+        }
+
+        function addPlanAssignment() {
+            if (!activeDuesMember) return;
+            const select = document.getElementById('addDueSelectPlan');
+            const selectedVal = select.value;
+            if (!selectedVal) {
+                alert('Please select a plan to assign.');
+                return;
+            }
+
+            const parts = selectedVal.split('_');
+            const month = parts[0];
+            const plan = parts[1];
+
+            fetch('/api/add_member_due', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: activeDuesMember.name, area: activeDuesMember.area, month: month, plan: plan })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Plan assigned successfully!');
+                    // Reload directory and reopen dues modal to refresh data
+                    fetch('/api/members?t=' + new Date().getTime())
+                        .then(res => res.json())
+                        .then(d => {
+                            globalMembers = d.members || [];
+                            const updatedM = globalMembers.find(m => m.name === activeDuesMember.name && m.area === activeDuesMember.area);
+                            if (updatedM) {
+                                activeDuesMember = updatedM;
+                                renderMemberDuesTable();
+                            }
+                            renderMembersDirectory();
+                        });
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+        }
+
+        function deletePlanAssignment(month, plan) {
+            if (!activeDuesMember) return;
+            if (!confirm(`Are you sure you want to remove plan line: Month ${month}, Amount ₹${parseInt(plan).toLocaleString()}?`)) {
+                return;
+            }
+
+            fetch('/api/delete_member_due', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: activeDuesMember.name, area: activeDuesMember.area, month: month, plan: plan })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Plan assignment removed!');
+                    fetch('/api/members?t=' + new Date().getTime())
+                        .then(res => res.json())
+                        .then(d => {
+                            globalMembers = d.members || [];
+                            const updatedM = globalMembers.find(m => m.name === activeDuesMember.name && m.area === activeDuesMember.area);
+                            if (updatedM) {
+                                activeDuesMember = updatedM;
+                                renderMemberDuesTable();
+                            }
+                            renderMembersDirectory();
+                        });
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            });
+        }
+
+        // 6. Populate Step 3 Auction details
+        function populateAuctionStep() {
+            // Default dates
+            const now = new Date();
+            const dateStr = now.toISOString().split('T')[0];
+            document.getElementById('globalDateInput').value = dateStr;
+
+            // Default sheet name (e.g. Dec-2025)
+            const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            document.getElementById('sheetNameInput').value = monthsShort[now.getMonth()] + "-" + now.getFullYear();
+
+            // Auction inputs per plan
+            const container = document.getElementById('auction-plans-bids-list');
+            container.innerHTML = '';
+
+            globalPlans.forEach(g => {
+                // Calculate next month using float rules (e.g. 12.1 -> 13.1)
+                const monthFloat = parseFloat(g.current_month);
+                let initialNext = monthFloat + 1;
+                if (monthFloat >= 20) {
+                    initialNext = 1;
+                } else {
+                    // Check if it's integer-equivalent
+                    if (Number.isInteger(initialNext)) {
+                        initialNext = parseInt(initialNext);
+                    }
+                }
+
+                // Render row
+                const item = document.createElement('div');
+                item.className = 'group-item';
+                item.style.padding = '20px';
+                item.style.background = 'rgba(52, 152, 219, 0.03)';
+                item.style.border = '1px solid rgba(52, 152, 219, 0.1)';
+                item.style.borderRadius = '12px';
+                item.style.marginBottom = '20px';
+                
+                // Winner dropdown options
+                let winnerOptions = '<option value="">Select Winner...</option>';
+                globalMembers.forEach(m => {
+                    winnerOptions += `<option value="${m.name}">${m.name} (${m.area})</option>`;
+                });
+
+                const isMonth20 = initialNext === 20;
+
+                item.innerHTML = `
+                    <div class="group-header" style="display:flex; justify-content:space-between; font-weight:700; margin-bottom:15px; color:var(--primary); font-size:1.1rem;">
+                        <span>Current Month: ${g.current_month}</span>
+                        <span style="color:var(--accent);">₹${g.plan_display}</span>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:12px;">
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div>
+                                <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.85rem; color:var(--text-muted);">Next Month</label>
+                                <input type="text" name="new_month_for_${g.id}" id="month_${g.id}" value="${initialNext}" required oninput="onMonthInputChanged('${g.id}')">
+                            </div>
+                            <div>
+                                <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.85rem; color:var(--text-muted);">Winning Bid Amount</label>
+                                <input type="number" name="bid_for_${g.id}" id="bid_${g.id}" value="0" placeholder="Bid Amount"
+                                    ${isMonth20 ? 'readonly style="background:rgba(0,0,0,0.05); cursor:not-allowed;"' : ''}>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="display:block; margin-bottom:5px; font-weight:600; font-size:0.85rem; color:var(--text-muted);">Select Bid Winner</label>
+                            <select name="winner_for_${g.id}" required>
+                                ${winnerOptions}
+                            </select>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function onMonthInputChanged(groupId) {
+            const monthInput = document.getElementById('month_' + groupId);
+            const bidInput = document.getElementById('bid_' + groupId);
+            if (monthInput && bidInput) {
+                const val = monthInput.value.trim();
+                if (val === '20' || val === '20.0') {
+                    bidInput.value = '0';
+                    bidInput.readOnly = true;
+                    bidInput.style.background = 'rgba(0,0,0,0.05)';
+                    bidInput.style.cursor = 'not-allowed';
+                } else {
+                    bidInput.readOnly = false;
+                    bidInput.style.background = '';
+                    bidInput.style.cursor = '';
+                }
+            }
+        }
+
+        // --- Dark Theme Toggle Logic ---
+        function toggleTheme() {
+            document.body.classList.toggle('dark-mode');
+            const icon = document.querySelector('#themeIcon i');
+
+            if (document.body.classList.contains('dark-mode')) {
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+                localStorage.setItem('theme', 'light');
+            }
+        }
+
+        // Initialize Theme
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+            const icon = document.querySelector('#themeIcon i');
+            if (icon) {
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+            }
+        }
+    </script>
+</body>
+
+</html>
