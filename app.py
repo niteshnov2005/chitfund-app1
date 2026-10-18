@@ -1222,6 +1222,17 @@ def whatsapp_send_all():
 
     return jsonify({'sent': sum(1 for r in results if r['success']), 'total': len(results), 'results': results})
 
+@app.route('/api/receipt_image')
+def receipt_image():
+    if 'user' not in session: return jsonify({'error': 'Unauthorized'}), 401
+    name = request.args.get('name'); area = request.args.get('area'); sheet = request.args.get('sheet')
+    member = find_member(sheet, name, area)
+    if not member:
+        return jsonify({'error': 'Member not found'}), 404
+    img_bytes = generate_receipt_image(member, sheet)
+    return send_file(io.BytesIO(img_bytes), mimetype='image/png',
+                     download_name="receipt_%s.png" % normalize_text(name))
+
 from itertools import groupby
 
 @app.route('/view_receipts')

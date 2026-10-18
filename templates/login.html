@@ -1,67 +1,235 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2c3e50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
+    <link rel="manifest" href="/manifest.json">
     <title>Chit Fund Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        main {
-    flex: 1;
-    padding: 30px;
-    overflow-y: auto;  /* THIS IS CRITICAL FOR SCROLLING */
-    height: 100vh;     /* This ensures it fills the screen */
-}
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
         body {
-            margin: 0; padding: 0;
             height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            background: linear-gradient(135deg, #2c3e50, #3498db);
-            font-family: sans-serif;
+            background: linear-gradient(45deg, #0f2027, #203a43, #2c5364);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
             overflow: hidden;
         }
-        /* Animated Background Bubbles */
-        .circles{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: 0;}
-        .circles li{ position: absolute; display: block; list-style: none; width: 20px; height: 20px; background: rgba(255, 255, 255, 0.2); animation: animate 25s linear infinite; bottom: -150px; }
-        .circles li:nth-child(1){ left: 25%; width: 80px; height: 80px; animation-delay: 0s; }
-        .circles li:nth-child(2){ left: 10%; width: 20px; height: 20px; animation-delay: 2s; animation-duration: 12s; }
-        .circles li:nth-child(3){ left: 70%; width: 20px; height: 20px; animation-delay: 4s; }
-        @keyframes animate { 0%{ transform: translateY(0) rotate(0deg); opacity: 1; border-radius: 0; } 100%{ transform: translateY(-1000px) rotate(720deg); opacity: 0; border-radius: 50%; } }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Abstract glowing orbs */
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: 0;
+            animation: float 10s infinite ease-in-out alternate;
+        }
+
+        .orb-1 {
+            width: 400px;
+            height: 400px;
+            background: rgba(52, 152, 219, 0.6);
+            top: -100px;
+            left: -100px;
+        }
+
+        .orb-2 {
+            width: 300px;
+            height: 300px;
+            background: rgba(155, 89, 182, 0.5);
+            bottom: -50px;
+            right: -50px;
+            animation-delay: -5s;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px) scale(1); }
+            100% { transform: translateY(30px) scale(1.1); }
+        }
 
         .login-box {
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 15px 25px rgba(0,0,0,0.2);
-            width: 300px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 50px 40px;
+            border-radius: 20px;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.2);
+            width: 360px;
             z-index: 1;
             text-align: center;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: slideUpFade 1s 0.2s forwards cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .login-box h2 { color: #2c3e50; margin-bottom: 30px; }
-        .input-group { position: relative; margin-bottom: 25px; }
-        .input-group input { width: 100%; padding: 10px 0; border: none; border-bottom: 2px solid #ccc; outline: none; background: transparent; }
-        .input-group label { position: absolute; top: 0; left: 0; padding: 10px 0; pointer-events: none; transition: 0.5s; color: #999; }
-        .input-group input:focus ~ label, .input-group input:valid ~ label { top: -20px; left: 0; color: #3498db; font-size: 12px; }
-        
+
+        @keyframes slideUpFade {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .login-box h2 {
+            color: #fff;
+            margin-bottom: 30px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            font-size: 28px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 10px;
+            border: none;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.5);
+            outline: none;
+            background: transparent;
+            color: #fff;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+
+        .input-group label {
+            position: absolute;
+            top: 12px;
+            left: 10px;
+            pointer-events: none;
+            transition: 0.3s;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .input-group input:focus,
+        .input-group input:valid {
+            border-bottom-color: #34dbcc;
+        }
+
+        .input-group input:focus~label,
+        .input-group input:valid~label {
+            top: -15px;
+            left: 0;
+            color: #34dbcc;
+            font-size: 13px;
+        }
+
         button {
-            background: #3498db; color: white; border: none;
-            padding: 10px 20px; border-radius: 5px; cursor: pointer;
-            font-size: 16px; width: 100%; transition: background 0.3s;
+            background: linear-gradient(90deg, #00c6ff 0%, #0072ff 100%);
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 16px;
+            width: 100%;
+            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 114, 255, 0.4);
+            letter-spacing: 1px;
+            margin-top: 10px;
         }
-        button:hover { background: #2980b9; }
-        .error { color: red; font-size: 0.9rem; margin-bottom: 15px; }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 114, 255, 0.6);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .error {
+            background: rgba(231, 76, 60, 0.2);
+            color: #ff7675;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+            border: 1px solid rgba(231, 76, 60, 0.4);
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+        }
+
+        /* Gavel Splash overlay rules */
+        #splashOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #111;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: white;
+        }
+
+        @keyframes gavelStrike {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(-35deg); }
+        }
+        @keyframes fadeInText {
+            to { opacity: 1; }
+        }
     </style>
 </head>
+
 <body>
-    <ul class="circles">
-        <li></li><li></li><li></li><li></li><li></li><li></li>
-    </ul>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <!-- One-time Gavel Strike Splash Screen -->
+    <div id="splashOverlay" style="display: none;">
+        <div style="font-size: 5rem; animation: gavelStrike 1.2s infinite alternate ease-in-out; margin-bottom: 25px;">
+            <i class="fas fa-gavel" style="color: #00c6ff;"></i>
+        </div>
+        <h1 style="font-size: 2.2rem; font-weight: 700; background: linear-gradient(90deg, #00c6ff, #0072ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 2px; margin-bottom: 10px; opacity: 0; animation: fadeInText 0.8s 0.4s forwards;">
+            CHIT FUND MANAGER
+        </h1>
+        <p style="color: #7f8c8d; font-size: 1rem; opacity: 0; animation: fadeInText 0.8s 0.8s forwards; font-weight: 400; letter-spacing: 1px;">Desktop Edition</p>
+    </div>
+
+    <!-- Auth Box -->
     <div class="login-box">
-        <h2>Admin Portal</h2>
+        <h2 id="formTitle">Admin Portal</h2>
         {% if error %}
-            <div class="error">{{ error }}</div>
+        <div class="error" id="errorBox">{{ error }}</div>
         {% endif %}
-        <form action="/login" method="POST">
+        
+        <!-- Login form -->
+        <form action="/login" method="POST" id="loginForm">
             <div class="input-group">
                 <input type="text" name="username" required>
                 <label>Username</label>
@@ -70,8 +238,91 @@
                 <input type="password" name="password" required>
                 <label>Password</label>
             </div>
-            <button type="submit">Login</button>
+            <button type="submit">LOGIN</button>
+            <p style="margin-top: 20px; font-size: 0.9rem; color: rgba(255,255,255,0.7);">
+                New user? <a href="#" onclick="toggleForm(true)" style="color: #34dbcc; text-decoration: none; font-weight: 600;">Create Account</a>
+            </p>
+        </form>
+
+        <!-- Signup form -->
+        <form id="signupForm" style="display: none;" onsubmit="handleSignup(event)">
+            <div class="input-group">
+                <input type="text" id="signupUsername" required>
+                <label>Choose Username</label>
+            </div>
+            <div class="input-group">
+                <input type="password" id="signupPassword" required>
+                <label>Choose Password</label>
+            </div>
+            <button type="submit">SIGN UP</button>
+            <p style="margin-top: 20px; font-size: 0.9rem; color: rgba(255,255,255,0.7);">
+                Have an account? <a href="#" onclick="toggleForm(false)" style="color: #34dbcc; text-decoration: none; font-weight: 600;">Login</a>
+            </p>
         </form>
     </div>
+
+    <script>
+        // Check for Splash Animation Show
+        window.addEventListener('DOMContentLoaded', () => {
+            const hasSeen = localStorage.getItem('splashSeen');
+            if (!hasSeen) {
+                const splash = document.getElementById('splashOverlay');
+                if (splash) {
+                    splash.style.display = 'flex';
+                    setTimeout(() => {
+                        splash.style.opacity = '0';
+                        splash.style.transition = 'opacity 0.6s ease';
+                        setTimeout(() => {
+                            splash.style.display = 'none';
+                        }, 600);
+                        localStorage.setItem('splashSeen', 'true');
+                    }, 3000); // 3 seconds splash display
+                }
+            }
+        });
+
+        function toggleForm(showSignup) {
+            const loginForm = document.getElementById('loginForm');
+            const signupForm = document.getElementById('signupForm');
+            const title = document.getElementById('formTitle');
+            const errorBox = document.getElementById('errorBox');
+            
+            if (errorBox) errorBox.style.display = 'none';
+            
+            if (showSignup) {
+                loginForm.style.display = 'none';
+                signupForm.style.display = 'block';
+                title.innerText = 'Create Account';
+            } else {
+                loginForm.style.display = 'block';
+                signupForm.style.display = 'none';
+                title.innerText = 'Admin Portal';
+            }
+        }
+
+        function handleSignup(event) {
+            event.preventDefault();
+            const u = document.getElementById('signupUsername').value.trim();
+            const p = document.getElementById('signupPassword').value.trim();
+            if (!u || !p) return;
+
+            fetch('/api/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Signup successful! Please login.');
+                    toggleForm(false);
+                } else {
+                    alert('Signup error: ' + data.error);
+                }
+            })
+            .catch(err => alert('Network error during signup.'));
+        }
+    </script>
 </body>
+
 </html>

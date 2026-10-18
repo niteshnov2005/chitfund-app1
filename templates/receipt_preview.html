@@ -3,36 +3,106 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2c3e50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
+    <link rel="manifest" href="/manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js');
+            });
+        }
+    </script>
     <title>Receipt Preview</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --bg: #eef2f5;
+            --card-bg: #ffffff;
+            --text-main: #2c3e50;
+            --text-muted: #7f8c8d;
+
+            /* Receipt Specific Colors */
+            --receipt-bg: #fafbfc;
+            --receipt-border: #e0e6ed;
+            --header-cell-bg: #f1f4f8;
+            --total-row-bg: #f8f9fa;
+        }
+
+        /* Dark Mode Variables Override */
+        body.dark-mode {
+            --primary: #ecf0f1;
+            --accent: #3498db;
+            --bg: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #ecf0f1;
+            --text-muted: #b0bec5;
+
+            --receipt-bg: #2d2d2d;
+            --receipt-border: #444;
+            --header-cell-bg: #383838;
+            --total-row-bg: #222;
+        }
+
         body {
-            font-family: 'Calibri', 'Segoe UI', sans-serif;
-            background: #555;
+            font-family: 'Outfit', 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
             padding: 20px;
+            margin: 0;
+            padding-top: 80px;
+            transition: background 0.3s, color 0.3s;
         }
 
         .page {
-            background: white;
+            background: var(--card-bg);
             max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
             min-height: 100vh;
+            animation: slideUp 0.6s ease-out;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* 2-Column Grid Layout */
         .grid-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            gap: 25px;
         }
 
         .receipt-container {
             page-break-inside: avoid;
-            border: 1px solid #eee;
-            /* Optional visual separation */
-            padding: 10px;
+            border: 1px solid var(--receipt-border);
+            border-radius: 8px;
+            padding: 15px;
+            background: var(--receipt-bg);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+            transition: transform 0.2s, background 0.3s, border-color 0.3s;
+        }
+
+        .receipt-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
         }
 
         table {
@@ -40,25 +110,29 @@
             border-collapse: collapse;
             margin-bottom: 5px;
             font-size: 13px;
+            background: var(--card-bg);
+            transition: background 0.3s;
         }
 
         /* Excel Grid Simulation */
         th,
         td {
-            border: 1px solid #ccc;
-            padding: 4px 8px;
+            border: 1px solid var(--receipt-border);
+            padding: 6px 10px;
+            transition: border-color 0.3s, color 0.3s, background 0.3s;
         }
 
         .header-cell {
-            background-color: #E0E0E0;
-            /* Light Grey */
-            font-weight: bold;
+            background-color: var(--header-cell-bg);
+            font-weight: 700;
+            color: var(--primary);
         }
 
         .col-header {
-            background-color: #E0E0E0;
-            font-weight: bold;
+            background-color: var(--header-cell-bg);
+            font-weight: 600;
             text-align: left;
+            color: var(--text-muted);
         }
 
         .text-right {
@@ -70,39 +144,25 @@
         }
 
         .total-row td {
-            background-color: #E0E0E0;
-            font-weight: bold;
-            border-top: 2px solid #aaa;
+            background-color: var(--total-row-bg);
+            font-weight: 700;
+            border-top: 2px solid var(--text-muted);
+            color: var(--primary);
+            font-size: 14px;
         }
 
         .no-border {
             border: none;
-            background: white;
+            background: var(--card-bg);
         }
 
         h1 {
             text-align: center;
-            color: #333;
-            margin-bottom: 20px;
+            color: var(--primary);
+            margin-bottom: 30px;
             grid-column: 1 / -1;
-        }
-
-        .print-btn {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #2196F3;
-            color: white;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: bold;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-            z-index: 100;
-        }
-
-        .print-btn:hover {
-            background: #1976D2;
+            font-size: 2rem;
+            font-weight: 700;
         }
 
         @media print {
@@ -154,58 +214,110 @@
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.95);
+            background: var(--card-bg);
             padding: 12px 25px;
             border-radius: 50px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             display: flex;
             align-items: center;
             gap: 15px;
             z-index: 1000;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: background 0.3s;
+        }
+
+        body.dark-mode .control-bar {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            background: rgba(30, 30, 30, 0.85);
         }
 
         .control-bar label {
-            font-weight: bold;
-            color: #333;
+            font-weight: 600;
+            color: var(--primary);
             font-size: 14px;
         }
 
         .control-bar select {
-            padding: 8px 15px;
-            border-radius: 20px;
-            border: 1px solid #ddd;
+            padding: 10px 20px;
+            border-radius: 30px;
+            border: 2px solid transparent;
             font-size: 14px;
             outline: none;
             cursor: pointer;
-            transition: border-color 0.3s;
+            transition: all 0.3s;
+            background: rgba(0, 0, 0, 0.05);
+            /* Softer form elements */
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        body.dark-mode .control-bar select {
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .control-bar select:focus {
-            border-color: #2196F3;
+            background: white;
+            border-color: #3498db;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.1);
         }
 
         .control-btn {
-            background: #2196F3;
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
             color: white;
-            padding: 8px 20px;
-            border-radius: 20px;
+            padding: 10px 24px;
+            border-radius: 30px;
             text-decoration: none;
-            font-weight: bold;
+            font-weight: 600;
             font-size: 14px;
-            transition: background 0.3s, transform 0.2s;
+            transition: all 0.3s;
             border: none;
             cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
         }
 
         .control-btn:hover {
-            background: #1976D2;
-            transform: translateY(-1px);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
         }
 
         .control-btn.secondary {
-            background: #27ae60;
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+        }
+
+        .control-btn.secondary:hover {
+            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
+        }
+
+        .control-btn.back-btn {
+            background: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            box-shadow: none;
+        }
+
+        .control-btn.back-btn:hover {
+            background: var(--primary);
+            color: var(--bg);
+            border-color: var(--primary);
+        }
+
+        .theme-toggle {
+            font-size: 1.2rem;
+            cursor: pointer;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            transition: transform 0.3s, color 0.3s;
+        }
+
+        .theme-toggle:hover {
+            color: var(--primary);
+            transform: scale(1.1) rotate(15deg);
         }
 
         /* Print styles */
@@ -230,7 +342,7 @@
         </select>
         <button class="control-btn" onclick="changeMonth()">View</button>
         <button class="control-btn secondary" onclick="window.print()">Print / Save PDF</button>
-        <a href="/dashboard" class="control-btn" style="background: #e67e22;">Back</a>
+        <a href="/dashboard" class="control-btn back-btn">Back</a>
     </div>
 
     <script>
@@ -300,11 +412,108 @@
                         <td class="text-right">{{ "{:,.2f}".format(m['total']) }}</td>
                     </tr>
                 </table>
+                <div class="wa-row" style="display:flex; gap:8px; margin-top:8px;">
+                    <input type="tel" class="wa-phone" placeholder="WhatsApp number e.g. 91XXXXXXXXXX"
+                           value="{{ m.get('phone', '') }}" data-name="{{ m['name'] }}" data-area="{{ m['area'] }}"
+                           style="flex:1; padding:6px 10px; border-radius:6px; border:1px solid var(--receipt-border); background:var(--card-bg); color:var(--text-main);">
+                    <button class="control-btn wa-send-btn" style="padding:6px 12px; font-size:12px; background:linear-gradient(135deg,#25D366 0%,#128C7E 100%);"
+                            onclick="openWhatsAppChat(this)">WhatsApp</button>
+                    <button class="control-btn secondary" style="padding:6px 12px; font-size:12px;"
+                            onclick="shareReceiptImage(this)">Share Image</button>
+                </div>
             </div>
             {% endfor %}
         </div>
     </div>
 
+    <script>
+        const CURRENT_SHEET = {{ active_sheet|tojson }};
+
+        function rowInfo(btn) {
+            const input = btn.closest('.wa-row').querySelector('.wa-phone');
+            return {input, phone: input.value.trim(), name: input.dataset.name, area: input.dataset.area};
+        }
+
+        function savePhone(info) {
+            return fetch('/api/whatsapp/set_phone', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name: info.name, area: info.area, phone: info.phone})
+            });
+        }
+
+        function receiptText(card, info) {
+            const rows = [...card.querySelectorAll('tr')].filter(r => !r.classList.contains('total-row') && r.querySelectorAll('td').length >= 4);
+            const lines = rows.map(r => {
+                const c = [...r.querySelectorAll('td')].map(td => td.textContent.trim());
+                return `${c[0]} (${c[1]}): ${c[3]}`;
+            });
+            const totalRow = card.querySelector('tr.total-row');
+            const total = totalRow ? [...totalRow.querySelectorAll('td')].pop().textContent.trim() : '';
+            return `*Payment Receipt*\nName: ${info.name}\nArea: ${info.area}\n` +
+                   (lines.length ? lines.join('\n') + '\n' : '') + `*Total Payable: ${total}*\n(${CURRENT_SHEET})`;
+        }
+
+        async function openWhatsAppChat(btn) {
+            const info = rowInfo(btn);
+            let digits = info.phone.replace(/\D/g, '');
+            if (digits.length === 10) digits = '91' + digits;   // assume India if no country code
+            if (!digits) { alert('Enter a WhatsApp number first.'); return; }
+            await savePhone(info);
+            const text = receiptText(btn.closest('.receipt-container'), info);
+            window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, '_blank');
+        }
+
+        async function shareReceiptImage(btn) {
+            const info = rowInfo(btn);
+            const url = `/api/receipt_image?name=${encodeURIComponent(info.name)}&area=${encodeURIComponent(info.area)}&sheet=${encodeURIComponent(CURRENT_SHEET)}`;
+            const original = btn.textContent;
+            btn.disabled = true; btn.textContent = 'Preparing...';
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Could not create image');
+                const blob = await res.blob();
+                const file = new File([blob], `receipt_${info.name}.png`, {type: 'image/png'});
+                if (navigator.canShare && navigator.canShare({files: [file]})) {
+                    await navigator.share({files: [file], title: 'Payment Receipt'});
+                } else {
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = file.name; a.click();
+                    alert('Image downloaded. Attach it in the WhatsApp chat manually.');
+                }
+            } catch (e) {
+                if (e.name !== 'AbortError') alert('Share failed: ' + e.message);
+            }
+            btn.disabled = false; btn.textContent = original;
+        }
+
+        // --- Dark Theme Toggle Logic ---
+        function toggleTheme() {
+            document.body.classList.toggle('dark-mode');
+            const icon = document.querySelector('#themeIcon i');
+
+            if (document.body.classList.contains('dark-mode')) {
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+                localStorage.setItem('theme', 'light');
+            }
+        }
+
+        // Initialize Theme
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+            const icon = document.querySelector('#themeIcon i');
+            if (icon) {
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+            }
+        }
+    </script>
 </body>
 
 </html>
